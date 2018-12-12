@@ -20,21 +20,38 @@ source-repository head
 
 library
   exposed-modules:
-      GPLVM.Core
+      Math
+      GPLVM.Basic
+      GPLVM.LinearSolver
+      GPLVM.PPCA
+      GPLVM.Types
+      GPLVM.Util
   other-modules:
       Paths_GPLVMHaskell
+      Math.Matrix
   hs-source-dirs:
       src
   build-depends:
-      JuicyPixels
-    , base >=4.7 && <5
+      base >=4.7 && <5
+--    , accelerate
+    , bed-and-breakfast
+    , containers
     , lens
     , vector
     , universum
+  build-tool-depends:
+      autoexporter:autoexporter
   default-language: Haskell2010
   ghc-options:         -Wall
                        -fno-warn-orphans
   default-extensions: NoImplicitPrelude
+                      RankNTypes
+                      TemplateHaskell
+                      TypeFamilies
+                      GADTs
+                      DataKinds
+                      TypeOperators
+                      TypeApplications
 
 executable GPLVMHaskell-exe
   main-is: Main.hs
