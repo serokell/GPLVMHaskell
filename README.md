@@ -4,7 +4,11 @@
 
 ### (Probabilistic) principal component analysis (PPCA)
 
-Principal component analysis is a technique for dimensionality reduction.
+Principal component analysis is a technique for dimensionality reduction. In other words, PCA allows one to reduce the size of data without loss of a general information.
+
+We perform this technique by extracting data and computing eigenvectors to form a feature vector.
+
+In contrast to PPCA, probabilistic PCA is a latent variable model, i.e. we have only the observed data set without its preimage.
 
 ### Gaussian process
 
