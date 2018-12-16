@@ -37,6 +37,7 @@ library
     , bed-and-breakfast
     , containers
     , lens
+    , repa
     , vector
     , universum
   build-tool-depends:
