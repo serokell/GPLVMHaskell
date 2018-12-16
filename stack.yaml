@@ -3,4 +3,9 @@ resolver: nightly-2018-12-15
 packages:
 - .
 
-# extra-deps:
+extra-deps:
+#- accelerate-1.2.0.1
+- bed-and-breakfast-0.5
+
+- git: https://github.com/adscib/monad-bayes
+  commit: 647ba7cb5a98ae028600f3d828828616891b40fb
