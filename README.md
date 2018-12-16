@@ -6,9 +6,9 @@
 
 Principal component analysis is a technique for dimensionality reduction. In other words, PCA allows one to reduce the size of data without loss of a general information.
 
-We perform this technique by extracting data and computing eigenvectors to form a feature vector.
+We perform this technique by extracting data and computing eigenvectors and eigenvalues of covariance matrix to form a feature vector. Eigenvectors are new axis and eigenvalues show the values of this axes - the more variance of data with respect to the axis - the arger is corresponding eigenvalue. And we can just get rid of the axes with low eigenvalues withous much losses.  
 
-In contrast to PPCA, probabilistic PCA is a latent variable model, i.e. we have only the observed data set without its preimage.
+In contrast to PPCA, probabilistic PCA is a latent variable model, i.e. we have only the observed data set without its preimage. We assume that observed data depends linearly from preimage. Every observed vector is represented as sum of **W** matrix, multiplied with corresponding preimage vector and noice with Gaussian distribution with mean zero. 
 
 ### Gaussian process
 
