@@ -60,7 +60,7 @@ data GaussianProcessLatentVariable a = GaussianProcessLatentVariable {
     }
 ```
 
-## What we need to do for GPLVM implementation.
+## What do we need to do for GPLVM implementation.
 
 Final goal: formalization of GPLVM via Haskell type system to propose a general framework to GPLVM.
 
@@ -69,6 +69,4 @@ Final goal: formalization of GPLVM via Haskell type system to propose a general 
 3. Research the current abilities of probabilistic programming, machine learning, and Bayes inference in Haskell;
 4. Similarly with linear algebra in Haskell, the most of observed libraries are quite old;
 5. Define the list of required mathematical constructions and operations from algebra, probability theory and numeric analysis.
-6. Formalize GPLVM using the background above:
-6.1. General GPLVM
-6.2. Demo application.
+6. Formalize GPLVM using the background above: general GPLVM and demo application.
