@@ -18,7 +18,7 @@ In other words, a function is said to be a gaussian process if and only if for a
 
 As we told before, we obtain a covariance matrix using a kernel function. Note that, covariance matrix is a symmetric and positive.
 
-That is, where GP is a prior over functions and prior dependes on a mean and this covariance function.
+That is, where GP is a prior over functions and prior depends on a mean and this covariance function.
 
 ## GPLVM summary
 
