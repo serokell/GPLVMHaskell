@@ -2,16 +2,15 @@ module GPLVM.Basic where
 
 import Universum hiding (transpose)
 
-import           Control.Lens (makeLenses)
+import Control.Lens (makeLenses)
 
-import           Data.Vector (Vector)
-import           Data.Vector as V
--- import qualified Data.Sequence as S
-import           Numeric.Matrix (Matrix, MatrixElement)
+import Data.Vector (Vector)
+import Data.Vector as V
+import Numeric.Matrix (Matrix, MatrixElement)
 import qualified Numeric.Matrix as M
 
-import           GPLVM.LinearSolver
-import           GPLVM.Util
+import GPLVM.LinearSolver
+import GPLVM.Util
 
 newtype EigenValue a = EigenValue { _unEigen :: a }
 

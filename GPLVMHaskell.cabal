@@ -20,10 +20,9 @@ source-repository head
 
 library
   exposed-modules:
-      Math
       GPLVM.Basic
       GPLVM.LinearSolver
-      GPLVM.PPCA
+      GPLVM.PCA
       GPLVM.Types
       GPLVM.Util
   other-modules:
@@ -33,11 +32,12 @@ library
       src
   build-depends:
       base >=4.7 && <5
---    , accelerate
     , bed-and-breakfast
     , containers
     , lens
+    , mtl
     , repa
+    , repa-linear-algebra
     , vector
     , universum
   build-tool-depends:
@@ -51,8 +51,11 @@ library
                       TypeFamilies
                       GADTs
                       DataKinds
+                      OverloadedStrings
+                      ScopedTypeVariables
                       TypeOperators
                       TypeApplications
+                      RecordWildCards
 
 executable GPLVMHaskell-exe
   main-is: Main.hs
