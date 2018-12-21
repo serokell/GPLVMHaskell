@@ -20,8 +20,6 @@ source-repository head
 
 library
   exposed-modules:
-      GPLVM.Basic
-      GPLVM.LinearSolver
       GPLVM.PCA
       GPLVM.Types
       GPLVM.Util
@@ -32,7 +30,6 @@ library
       src
   build-depends:
       base >=4.7 && <5
-    , bed-and-breakfast
     , containers
     , lens
     , mtl

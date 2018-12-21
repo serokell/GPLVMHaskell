@@ -4,11 +4,9 @@ packages:
 - .
 
 extra-deps:
-#- accelerate-1.2.0.1
-- bed-and-breakfast-0.5
+- primitive-0.6.1.1
 
 - git: https://github.com/adscib/monad-bayes
   commit: 647ba7cb5a98ae028600f3d828828616891b40fb
 - git: https://github.com/Haskell-mouse/repa-linear-algebra
-  commit 5ffb3ae1143ad244684ded5dd1aab5ebf88289ba
-- primitive-0.6.1.1
+  commit: 5ffb3ae1143ad244684ded5dd1aab5ebf88289ba
