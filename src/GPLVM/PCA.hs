@@ -1,4 +1,7 @@
-module GPLVM.PCA where
+module GPLVM.PCA
+       ( PCA (..)
+       , makePCA
+       ) where
 
 import Universum hiding (All, Vector, transpose)
 

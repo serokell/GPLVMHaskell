@@ -1,9 +1,9 @@
 cabal-version: 1.12
 name:           GPLVMHaskell
 version:        0.1.0.0
-description:    Please see the README on GitHub at <https://github.com/githubuser/GPLVMHaskell#readme>
-homepage:       https://github.com/githubuser/GPLVMHaskell#readme
-bug-reports:    https://github.com/githubuser/GPLVMHaskell/issues
+description:    Please see the README on GitHub at <https://github.com/serokell/GPLVMHaskell#readme>
+homepage:       https://github.com/serokell/GPLVMHaskell#readme
+bug-reports:    https://github.com/serokell/GPLVMHaskell/issues
 author:         Author name here
 maintainer:     example@example.com
 copyright:      2018 Author name here
@@ -12,15 +12,17 @@ license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
     README.md
-    ChangeLog.md
 
 source-repository head
   type: git
-  location: https://github.com/githubuser/GPLVMHaskell
+  location: https://github.com/serokell/GPLVMHaskell
 
 library
   exposed-modules:
+      GPLVM.GaussianProcess
+      GPLVM.GaussianProcessLV
       GPLVM.PCA
+      GPLVM.IVM
       GPLVM.Types
       GPLVM.Util
   other-modules:
@@ -33,8 +35,11 @@ library
     , containers
     , lens
     , mtl
+    , normaldistribution
+    , random
     , repa
     , repa-linear-algebra
+    , statistics
     , vector
     , universum
   build-tool-depends:
