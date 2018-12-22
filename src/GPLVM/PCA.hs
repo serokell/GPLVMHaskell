@@ -1,6 +1,6 @@
 module GPLVM.PCA where
 
-import Universum hiding (Vector, All)
+import Universum hiding (All, Vector, transpose)
 
 import GPLVM.Types
 
@@ -10,11 +10,11 @@ import Data.Array.Repa.Repr.ForeignPtr
 import Numeric.LinearAlgebra.Repa hiding (Matrix, Vector)
 
 data PCA = PCA
-  {   _inputData :: Matrix D Double
-    , _covariance  :: Covariance Double
+  {   _inputData    :: Matrix D Double
+    , _covariance   :: Covariance Double
     , _eigenVectors :: EigenVectors Double
-    , _eigenValues :: Vector F Double
-    , _finalData :: Matrix D Double
+    , _eigenValues  :: Vector F Double
+    , _finalData    :: Matrix D Double
     , _restoredData :: Matrix D Double
   }
 
@@ -26,18 +26,19 @@ makePCA
     -> PCA
 makePCA desiredDimensions input =
   let _inputData@(Matrix inp) = input
-      (Z :. yInp :. _) = extent inp
-      (meanVec, _covariance) = runIdentity $ meanCovP inp
-      adjustInput = inp -^ (extend (Z :. yInp :. All) meanVec)
+      (Z :. yInp :. _) = extent inp                                          -- get dimension
+      (meanVec, _covariance) = meanCovS inp
+      meanMatrix = extend (Z :. yInp :. All) meanVec
+      adjustInput' = inp -^ meanMatrix
       (_eigenValues, eigenVec) = first Vector $ eigSH _covariance
-      (AForeignPtr (Z :. y :. x) _ _) = eigenVec
-      eigenVectors' =
+      eigenVecD@(ADelayed (Z :. y :. x) f) = transpose eigenVec              -- transposing is almost free
+      eigenVectors' =                                                        -- leave only n desired eigenvectors
         if desiredDimensions >= y
-        then eigenVec
-        else fromForeignPtr (Z :. desiredDimensions :. x) $ toForeignPtr eigenVec
-      _eigenVectors = Matrix eigenVectors'
-      finalData' =
-          runIdentity $ smap id eigenVectors' `mulP` adjustInput
-      _finalData = Matrix $ smap id $ finalData'
-      _restoredData = Matrix $ smap id $ inv eigenVectors' `mul` finalData'
+        then eigenVecD
+        else ADelayed (Z :. desiredDimensions :. x) f
+      _eigenVectors = Matrix $ transpose eigenVectors'                       -- colunmns are eigenvectors
+      finalData' = runIdentity $ eigenVectors' `mulP` transpose adjustInput' -- data in new eigenvectors space
+      _finalData = Matrix $ transpose finalData'
+      restoredDataWOMean = transpose $ pinvS eigenVectors' `mul` finalData'  -- restore to the original space
+      _restoredData = Matrix $ restoredDataWOMean +^ meanMatrix              -- add mean
   in PCA{..}

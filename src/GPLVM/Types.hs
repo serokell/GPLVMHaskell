@@ -19,9 +19,11 @@ newtype Matrix r a = Matrix { _unMatrix :: Array r DIM2 a }
 
 makeLenses ''Matrix
 
-newtype Vector r a = Vector (Array r DIM1 a)
+newtype Vector r a = Vector { _unVector :: Array r DIM1 a}
 
-type EigenVectors a = Matrix F a
+makeLenses ''Vector
+
+type EigenVectors a = Matrix D a
 
 -- Real matrix, represented as unboxed vector.
 -------

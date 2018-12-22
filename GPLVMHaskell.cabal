@@ -70,3 +70,5 @@ executable GPLVMHaskell-exe
                        -fno-warn-orphans
   default-extensions:   NoImplicitPrelude
                         TemplateHaskell
+                        TypeApplications
+                        OverloadedStrings

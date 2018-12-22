@@ -3,4 +3,4 @@ module Main where
 import Universum
 
 main :: IO ()
-main = putStrLn "wip"
+main = putStrLn @Text "wip"
