@@ -1,16 +1,42 @@
-module GPLVM.GaussianProcessLV where
+module GPLVM.GaussianProcessLV
+       ( GaussianProcessLatentVariable (..)
+       , gP
+       , initializeLatent
+       , lvObserved
+       ) where
 
 import Universum
 
 import Control.Lens (makeLenses)
 
 import Data.Array.Repa
-import GPLVM.Types (Distribution, Matrix (..), ObservedData (..))
 
-data GaussianProcessLatentVariable a = GaussianProcessLatentVariable {
-      _GPLVMObserved :: ObservedData a
-    , _kerGPLVM :: Matrix D a -> Matrix D a -> Matrix D a
-    , _distrGPLVM ::  Distribution D a
+import GPLVM.GaussianProcess
+import GPLVM.PCA
+import GPLVM.Types (Matrix (..), ObservedData (..), unObservedData)
+
+data GaussianProcessLatentVariable = GaussianProcessLatentVariable
+    { _lvObserved :: ObservedData Double
+    , _gP :: GaussianProcess Double
     }
 
 makeLenses ''GaussianProcessLatentVariable
+
+initializeLatent
+    :: Int
+    -> ObservedData Double
+    -> Matrix D Double
+initializeLatent latentDimension observedData =
+    (makePCA latentDimension (observedData ^. unObservedData)) ^. finalData
+
+
+{-
+toGPLV
+    :: Int
+       -- latent dimension
+    -> ObservedData Double
+       -- observed data
+    -> GaussianProcessLatentVariable
+toGPLV latentDimension observedData =
+    initializeLatent latentDimension observedData
+-}

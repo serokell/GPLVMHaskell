@@ -1,6 +1,12 @@
 module GPLVM.PCA
        ( PCA (..)
+       , covariance
+       , eigenValues
+       , eigenVectors
+       , inputData
+       , finalData
        , makePCA
+       , restoredData
        ) where
 
 import Universum hiding (All, Vector, transpose)
