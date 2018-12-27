@@ -4,7 +4,13 @@ http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.440.3620&rep=rep1&type=
 
 -}
 
-module GPLVM.IVM where
+module GPLVM.IVM
+       ( IVMInput (..)
+       , IVMOutput (..)
+       , simpleIVM
+       , unInput
+       , unOutput
+       ) where
 
 import Universum hiding (Vector)
 
@@ -14,9 +20,12 @@ import Numeric.LinearAlgebra.Repa hiding (Matrix, Vector)
 
 import GPLVM.Types
 
-newtype IVMInput a = IVMInput { unInput :: Matrix a }
+newtype IVMInput a = IVMInput { unInput :: Matrix D a }
 
-newtype IVMOutput a = IVMOutput { unOutput :: Matrix a }
+newtype IVMOutput a = IVMOutput { unOutput :: Matrix D a }
+
+makeLenses ''IVMInput
+makeLenses ''IVMOutput
 
 ----- simple ivm
 
@@ -24,8 +33,7 @@ simpleIVM
     :: IVMInput a
     -> Int      --- a new number of rows
     -> IVMOutput a
-simpleIVM input@(IVMInput matrixInput) =
-
-
+simpleIVM input@(IVMInput matrixInput) rows =
+    undefined
 
 ----- multitask ivm

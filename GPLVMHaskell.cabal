@@ -33,14 +33,17 @@ library
   build-depends:
       base >=4.7 && <5
     , containers
+    , hmatrix
     , lens
     , mtl
     , normaldistribution
     , random
     , repa
     , repa-linear-algebra
+    , singletons
     , statistics
     , vector
+    , vinyl
     , universum
   build-tool-depends:
       autoexporter:autoexporter
