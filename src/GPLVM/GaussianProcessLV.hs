@@ -24,10 +24,12 @@ makeLenses ''GaussianProcessLatentVariable
 
 initializeLatent
     :: Int
-    -> ObservedData Double
+    -> GaussianProcessLatentVariable
     -> Matrix D Double
-initializeLatent latentDimension observedData =
+initializeLatent latentDimension gpLV =
     (makePCA latentDimension (observedData ^. unObservedData)) ^. finalData
+    where
+        observedData = gpLV ^. lvObserved
 
 
 {-

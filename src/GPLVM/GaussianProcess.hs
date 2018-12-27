@@ -43,8 +43,7 @@ newtype PosteriorSample a = PosteriorSample (Matrix D a)
 -- (just apply kernel function)
 
 testValueCovariaceMatrix
-    :: forall a. Eq a
-    => GaussianProcess a
+    :: forall a. GaussianProcess a
     -> InputObservations a
     -> Matrix D a
 testValueCovariaceMatrix gP observations = kernelMatrix
@@ -67,12 +66,13 @@ functionalPrior
     )
     => Matrix D a
     -> g
-    -> Matrix D a
-functionalPrior matrix@(Matrix (ADelayed (Z :. rows :. cols) _)) gen =
-    Matrix $
-    smap id $
-    ((cholD . symS) $ matrix ^. unMatrix) `mulS`
-    (randomCoeffs ^. unMatrix)
+    -> Maybe (Matrix D a)
+functionalPrior matrix@(Matrix (ADelayed (Z :. rows :. cols) _)) gen = do
+    case (mbChol . symS) $ matrix ^. unMatrix of
+        Nothing -> Nothing
+        Just matrix' -> do
+            let matrixD = smap id matrix'
+            return $ Matrix $ smap id (matrixD `mulS` (randomCoeffs ^. unMatrix))
     where
         randomCoeffs = randomMatrixD gen (cols, rows)
 
@@ -116,4 +116,6 @@ gpToTrainingData inputObserve gP trainingData gen = do
     let postF' = (cholD . symS) $
                      (covarianceMatrix ^. unMatrix) -^
                      (transpose cholKSolve' `mulD` cholKSolve')
-    return $ PosteriorSample . Matrix $ mean +^ (functionalPrior (Matrix postF') gen ^. unMatrix)
+    prior' <- functionalPrior (Matrix postF') gen
+    let prior = prior' ^. unMatrix
+    return $ PosteriorSample . Matrix $ mean +^ prior
