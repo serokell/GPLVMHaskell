@@ -55,12 +55,11 @@ makeMatrix
     -> SomeMatrix r a
 makeMatrix array =
   let (Z :. y :. x) = extent array
-      (Just k) = someNatVal $ fromIntegral y
-
-      uk = case k of
+      (Just k) = someNatVal $ fromIntegral y in
+      case k of
       	SomeNat (Proxy :: Proxy n) -> case (someNatVal $ fromIntegral y) of
       	  Just (SomeNat (Proxy :: Proxy m)) -> SomeMatrix $ (Matrix array :: Matrix r m n a)
-  in undefined
+          Nothing -> error "izviniti: pepe_sad"
 
 
 mulM
@@ -77,6 +76,7 @@ mulM mk1 mk2 =
   	 then Matrix $ res
   	 else (error "test")
 
+{-
 sMult
     :: forall m2 n2 m3 n3 .
     KnownNats [m2, n2, m3, n3]
@@ -87,3 +87,4 @@ sMult matr1 matr2 =
 	case matr1 of
 		(SomeMatrix (mat1 :: forall m1 n1 . (KnownNat n1, KnownNat m1) => Matrix D m1 n1 Double)) -> case matr2 of
 		  (SomeMatrix (mat2 :: Matrix D m2 n2 Double)) -> SomeMatrix $ ( mat1 `mulM` mat2 ::  Matrix F m3 n3 Double)
+-}
