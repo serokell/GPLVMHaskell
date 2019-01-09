@@ -1,5 +1,6 @@
 module GPLVM.Util
        ( randomMatrixD
+       , sumListMatrices
        , toLatentSpacePoints
        , transposeMatrix
        , updateMatrix
@@ -12,7 +13,7 @@ import Data.Array.Repa
 import Data.Array.Repa.Repr.Unboxed (Unbox)
 
 import Data.Random.Normal
-import Numeric.LinearAlgebra.Repa hiding (Vector, Matrix)
+import Numeric.LinearAlgebra.Repa hiding (Matrix, Vector)
 import System.Random (Random, RandomGen)
 
 import GPLVM.Types
@@ -21,7 +22,7 @@ updateMatrix
     :: (Array r DIM2 a -> Array r DIM2 a)
     -> Matrix r a
     -> Matrix r a
-updateMatrix f (Matrix m) = Matrix (f m)
+updateMatrix f m = f m
 
 transposeMatrix
     :: Matrix D a
@@ -33,7 +34,7 @@ updateMatrix2
     -> Matrix r a
     -> Matrix r a
     -> Matrix r a
-updateMatrix2 f (Matrix m) (Matrix n) = Matrix (f m n)
+updateMatrix2 f m n = f m n
 
 
 toLatentSpacePoints
@@ -53,4 +54,10 @@ randomMatrixD
     -> Matrix D a
 randomMatrixD gen (rows, cols) =
     let randomList = take (rows * cols) (normals gen) in
-    Matrix $ (smap id $ fromListUnboxed (Z :. rows :. cols) randomList)
+    delay $ fromListUnboxed (Z :. rows :. cols) randomList
+
+sumListMatrices
+    :: forall a. (Unbox a, Num a)
+    => [Matrix D a]
+    -> Matrix D a
+sumListMatrices = foldl1 (\acc m -> acc +^ m)

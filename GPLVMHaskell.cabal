@@ -22,6 +22,7 @@ library
       GPLVM.GaussianProcess
       GPLVM.GaussianProcessLV
       GPLVM.PCA
+      GPLVM.PPCA
       GPLVM.IVM
       GPLVM.Types
       GPLVM.Util

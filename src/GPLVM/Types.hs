@@ -10,8 +10,6 @@ module GPLVM.Types
        , ObservedData (..)
        , Vector (..)
        , unLatentSpacePoints
-       , unVector
-       , unMatrix
        , unObservedData
        , unInputObs
        ) where
@@ -31,15 +29,9 @@ type Mean r a = Matrix r a -> a
 
 type Covariance a = Herm a
 
-newtype Matrix r a = Matrix { _unMatrix :: Array r DIM2 a }
-    deriving Eq
+type Matrix r a = Array r DIM2 a
 
-makeLenses ''Matrix
-
-newtype Vector r a = Vector { _unVector :: Array r DIM1 a}
-    deriving Eq
-
-makeLenses ''Vector
+type Vector r a = Array r DIM1 a
 
 type EigenVectors a = Matrix D a
 

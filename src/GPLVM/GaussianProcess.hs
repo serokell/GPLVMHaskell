@@ -1,5 +1,4 @@
-{-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE AllowAmbiguousTypes, ConstraintKinds #-}
 
 module GPLVM.GaussianProcess
        ( GaussianProcess (..)
@@ -20,8 +19,8 @@ import Data.Array.Repa.Repr.Unboxed (Unbox)
 import Numeric.LinearAlgebra.Repa hiding (Matrix, Vector)
 import System.Random (Random, RandomGen)
 
-import GPLVM.Types (KernelFunction, Matrix (..), Mean,
-                    InputObservations (..), unInputObs, unMatrix)
+import GPLVM.Types
+  (InputObservations(..), KernelFunction, Matrix, Mean, unInputObs)
 import GPLVM.Util (randomMatrixD)
 
 data GaussianProcess a = GaussianProcess
@@ -67,12 +66,12 @@ functionalPrior
     => Matrix D a
     -> g
     -> Maybe (Matrix D a)
-functionalPrior matrix@(Matrix (ADelayed (Z :. rows :. cols) _)) gen = do
-    case (mbChol . symS) $ matrix ^. unMatrix of
+functionalPrior matrix@(ADelayed (Z :. rows :. cols) _) gen = do
+    case (mbChol . symS) $ matrix of
         Nothing -> Nothing
         Just matrix' -> do
-            let matrixD = smap id matrix'
-            return $ Matrix $ smap id (matrixD `mulS` (randomCoeffs ^. unMatrix))
+            let matrixD = delay matrix'
+            return $ delay (matrixD `mulS` randomCoeffs)
     where
         randomCoeffs = randomMatrixD gen (cols, rows)
 
@@ -95,15 +94,15 @@ gpToTrainingData inputObserve gP trainingData gen = do
         -- kernel applied to input training points
     let trainingKernel = (gP ^. kernelGP) inputTrain' inputTrain'
         -- Cholesky decomposition applied to kernel of training points
-    let cholK = (cholD . symS) (trainingKernel ^. unMatrix)
+    let cholK = (cholD . symS) trainingKernel
 
         -- test points mean
     let testPointMean = (gP ^. kernelGP) (inputObserve ^. unInputObs) inputTrain'
 
-    cholKSolve <- linearSolveS cholK (testPointMean ^. unMatrix)
+    cholKSolve <- linearSolveS cholK testPointMean
 
         -- solve linear system for output training points
-    cholKSolveOut <- linearSolveS cholK ((trainingData ^. outputTrain) ^. unMatrix)
+    cholKSolveOut <- linearSolveS cholK (trainingData ^. outputTrain)
 
     let cholKSolve' = smap id cholKSolve
     let cholKSolveOut' = smap id cholKSolveOut
@@ -114,8 +113,8 @@ gpToTrainingData inputObserve gP trainingData gen = do
 
         -- posterior
     let postF' = (cholD . symS) $
-                     (covarianceMatrix ^. unMatrix) -^
+                     covarianceMatrix -^
                      (transpose cholKSolve' `mulD` cholKSolve')
-    prior' <- functionalPrior (Matrix postF') gen
-    let prior = prior' ^. unMatrix
-    return $ PosteriorSample . Matrix $ mean +^ prior
+    prior' <- functionalPrior postF' gen
+    let prior = prior'
+    return $ PosteriorSample $ mean +^ prior
