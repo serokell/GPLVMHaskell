@@ -19,8 +19,7 @@ import Data.Array.Repa.Repr.Unboxed (Unbox)
 import Numeric.LinearAlgebra.Repa hiding (Matrix, Vector)
 import System.Random (Random, RandomGen)
 
-import GPLVM.Types
-  (InputObservations(..), KernelFunction, Matrix, Mean, unInputObs)
+import GPLVM.Types (InputObservations(..), KernelFunction, Matrix, Mean, unInputObs)
 import GPLVM.Util (randomMatrixD)
 
 data GaussianProcess a = GaussianProcess
@@ -104,9 +103,9 @@ gpToTrainingData inputObserve gP trainingData gen = do
         -- solve linear system for output training points
     cholKSolveOut <- linearSolveS cholK (trainingData ^. outputTrain)
 
-    let cholKSolve' = smap id cholKSolve
-    let cholKSolveOut' = smap id cholKSolveOut
-    let mulD m n = smap id (mulS m n)
+    let cholKSolve' = delay cholKSolve
+    let cholKSolveOut' = delay cholKSolveOut
+    let mulD m n = delay (mulS m n)
 
         -- compute mean
     let mean = transpose cholKSolve' `mulD` cholKSolveOut'
