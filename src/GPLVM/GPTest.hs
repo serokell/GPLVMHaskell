@@ -1,11 +1,12 @@
 module GPLVM.GPTest where
 
-import Universum
+import Universum hiding (transpose)
 import Prelude ((!!))
 
 import Data.Array.Repa
 import Numeric.LinearAlgebra.Repa hiding (Matrix)
 
+import GPLVM.GaussianProcess
 import GPLVM.Types
 import GPLVM.Util
 
@@ -104,3 +105,18 @@ xTrain = fromFunction (Z :. 5 :. 1) xTrainFunction
 
 yTrain :: Matrix D Double
 yTrain = smap sin xTrain
+
+testTrainingData :: GPTrainingData Double
+testTrainingData = GPTrainingData xTrain yTrain
+
+meanTest :: GPMean Double
+meanTest matrix = delay (lkT `mulS` (delay $ (fromMaybeSilly (linearSolveS l yTrain))))
+    where
+        k = kernelFunction matrix xTrain
+        l = cholD . symS $ k
+        lK = fromMaybeSilly (linearSolveS l k)
+        lkT = transpose lK
+        fromMaybeSilly = fromMaybe (error "something went wrong")
+
+testGaussianProcess :: GaussianProcess Double
+testGaussianProcess = GaussianProcess kernelFunction meanTest

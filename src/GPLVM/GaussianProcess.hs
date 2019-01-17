@@ -2,6 +2,8 @@
 
 module GPLVM.GaussianProcess
        ( GaussianProcess (..)
+       , GPMean
+       , GPTrainingData (..)
        , PosteriorSample (..)
        , functionalPrior
        , gpToTrainingData
@@ -19,12 +21,14 @@ import Data.Array.Repa.Repr.Unboxed (Unbox)
 import Numeric.LinearAlgebra.Repa hiding (Matrix, Vector)
 import System.Random (Random, RandomGen)
 
-import GPLVM.Types (InputObservations(..), KernelFunction, Matrix, Mean, unInputObs)
+import GPLVM.Types (InputObservations(..), KernelFunction, Matrix, unInputObs)
 import GPLVM.Util (randomMatrixD)
+
+type GPMean a = Matrix D a -> Matrix D a
 
 data GaussianProcess a = GaussianProcess
     { _kernelGP :: KernelFunction a
-    , _meanGP ::  Mean D a
+    , _meanGP ::  GPMean a
     }
 
 data GPTrainingData a = GPTrainingData
@@ -35,7 +39,7 @@ data GPTrainingData a = GPTrainingData
 makeLenses ''GaussianProcess
 makeLenses ''GPTrainingData
 
-newtype PosteriorSample a = PosteriorSample (Matrix D a)
+newtype PosteriorSample a = PosteriorSample { unSample :: Matrix D a }
 
 -- covariance between gP input and gP output
 -- (just apply kernel function)
@@ -64,15 +68,12 @@ functionalPrior
     )
     => Matrix D a
     -> g
-    -> Maybe (Matrix D a)
-functionalPrior matrix@(ADelayed (Z :. rows :. cols) _) gen = do
-    case (mbChol . symS) $ matrix of
-        Nothing -> Nothing
-        Just matrix' -> do
-            let matrixD = delay matrix'
-            return $ delay (matrixD `mulS` randomCoeffs)
+    -> Int               --- number of samples for prior
+    -> Matrix D a
+functionalPrior matrix@(ADelayed (Z :. rows :. cols) _) gen sampleNumber =
+    delay $ matrix `mulS` randomCoeffs
     where
-        randomCoeffs = randomMatrixD gen (cols, rows)
+        randomCoeffs = randomMatrixD gen (cols, sampleNumber)
 
 gpToTrainingData
     :: forall a g.
@@ -84,8 +85,9 @@ gpToTrainingData
     -> GaussianProcess a
     -> GPTrainingData a
     -> g
+    -> Int
     -> Maybe (PosteriorSample a)
-gpToTrainingData inputObserve gP trainingData gen = do
+gpToTrainingData inputObserve gP trainingData gen sampleNumber = do
     let covarianceMatrix = testValueCovariaceMatrix gP inputObserve
         -- get covariance matrix for test inputs
     let inputTrain' = trainingData ^. inputTrain
@@ -114,6 +116,5 @@ gpToTrainingData inputObserve gP trainingData gen = do
     let postF' = (cholD . symS) $
                      covarianceMatrix -^
                      (transpose cholKSolve' `mulD` cholKSolve')
-    prior' <- functionalPrior postF' gen
-    let prior = prior'
+    let prior = functionalPrior postF' gen sampleNumber
     return $ PosteriorSample $ mean +^ prior
