@@ -10,7 +10,7 @@ extra-deps:
 - git: https://github.com/adscib/monad-bayes
   commit: 647ba7cb5a98ae028600f3d828828616891b40fb
 - git: https://github.com/Haskell-mouse/repa-linear-algebra
-  commit: e3dc19f8cc9f01577f8005b8c5440ff116d5b522
+  commit: 0cf2036e4423a14bbaf404e89bdd8f7c7321021d
 
 extra-lib-dirs:
  - /usr/lib

@@ -65,22 +65,11 @@ testList = [ -5.0
            ,  5.0
            ]
 
-
-
-xTestDim :: DIM2
-xTestDim = (Z :. 50 :. 1)
-
-xTestFunction :: DIM2 -> Double
-xTestFunction (Z :. n :. _) = testList !! n
-
 xTest :: Matrix D Double
-xTest = fromFunction xTestDim xTestFunction
-
-xTest' :: Matrix D Double
-xTest' = delay $ fromUnboxed xTestDim (V.fromList testList)
+xTest = delay $ fromUnboxed (Z :. 50 :. 1) (V.fromList testList)
 
 inputObserve :: InputObservations Double
-inputObserve = InputObservations xTest'
+inputObserve = InputObservations xTest
 
 foo :: Array D DIM2 Double -> Array U DIM2 Double
 foo = computeS @D @_ @_ @U
@@ -91,9 +80,7 @@ matrixSub
     -> Matrix D a
     -> Matrix D a
 matrixSub vec@(ADelayed (Z :. len) f) matrix@(ADelayed (Z :. rows :. cols) g) =
-    case (rows == len) of
-        False -> error "matrixSub: length of vector should be equal to the number of rows"
-        True -> delay $ newMatrix -^ matrix
+    delay $ newMatrix -^ matrix
     where
         newMatrix = fromFunction (Z :. rows :. cols) subFunction
         subFunction (Z :. rows' :. cols') = f (Z :. rows')
@@ -104,9 +91,7 @@ matrixSum
     -> Matrix D a
     -> Matrix D a
 matrixSum vec@(ADelayed (Z :. len) f) matrix@(ADelayed (Z :. rows :. cols) g) =
-    case (rows == len) of
-        False -> error "matrixSub: length of vector should be equal to the number of rows"
-        True -> delay $ newMatrix +^ matrix
+    newMatrix +^ matrix
     where
         newMatrix = fromFunction (Z :. rows :. cols) sumFunction
         sumFunction (Z :. rows' :. cols') = f (Z :. rows')
@@ -134,11 +119,8 @@ kernelFunction matrix1 matrix2 =
 xTrainList :: [Double]
 xTrainList = [-4, -3, -2, -1, 1]
 
-xTrainFunction :: DIM2 -> Double
-xTrainFunction (Z :. n :. _) = xTrainList !! n
-
 xTrain :: Matrix D Double
-xTrain = delay $ fromUnboxed xTestDim (V.fromList xTrainList)
+xTrain = delay $ fromUnboxed (Z :. 5 :. 1) (V.fromList xTrainList)
 
 yTrain :: Matrix D Double
 yTrain = smap sin xTrain

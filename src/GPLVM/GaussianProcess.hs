@@ -95,7 +95,7 @@ gpToPosteriorSample inputObserve gP trainingData gen sampleNumber = do
         -- kernel applied to input training points
     let trainingKernel = (gP ^. kernelGP) inputTrain' inputTrain'
         -- Cholesky decomposition applied to kernel of training points
-    let cholK = (cholD . symS) trainingKernel
+    let cholK = cholSH trainingKernel
 
         -- test points mean
     let testPointMean = (gP ^. kernelGP) (inputObserve ^. unInputObs) inputTrain'
@@ -113,7 +113,7 @@ gpToPosteriorSample inputObserve gP trainingData gen sampleNumber = do
     let mean = transpose cholKSolve' `mulD` cholKSolveOut'
 
         -- posterior
-    let postF' = (cholD . symS) $
+    let postF' = cholSH $
                      covarianceMatrix -^
                      (transpose cholKSolve' `mulD` cholKSolve')
     let prior = functionalPrior postF' gen sampleNumber
