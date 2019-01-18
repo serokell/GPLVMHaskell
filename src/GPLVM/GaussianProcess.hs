@@ -6,7 +6,7 @@ module GPLVM.GaussianProcess
        , GPTrainingData (..)
        , PosteriorSample (..)
        , functionalPrior
-       , gpToTrainingData
+       , gpToPosteriorSample
        , kernelGP
        , meanGP
        , testValueCovariaceMatrix
@@ -75,7 +75,7 @@ functionalPrior matrix@(ADelayed (Z :. rows :. cols) _) gen sampleNumber =
     where
         randomCoeffs = randomMatrixD gen (cols, sampleNumber)
 
-gpToTrainingData
+gpToPosteriorSample
     :: forall a g.
     ( GPConstraint a
     , Eq a
@@ -87,7 +87,7 @@ gpToTrainingData
     -> g
     -> Int
     -> Maybe (PosteriorSample a)
-gpToTrainingData inputObserve gP trainingData gen sampleNumber = do
+gpToPosteriorSample inputObserve gP trainingData gen sampleNumber = do
     let covarianceMatrix = testValueCovariaceMatrix gP inputObserve
         -- get covariance matrix for test inputs
     let inputTrain' = trainingData ^. inputTrain

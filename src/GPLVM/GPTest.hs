@@ -1,10 +1,12 @@
 module GPLVM.GPTest where
 
-import Universum hiding (transpose)
+import Universum hiding (transpose, Vector)
 import Prelude ((!!))
 
+import Data.Vector.Unboxed as V (fromList)
+
 import Data.Array.Repa
-import Numeric.LinearAlgebra.Repa hiding (Matrix)
+import Numeric.LinearAlgebra.Repa hiding (Matrix, Vector)
 
 import GPLVM.GaussianProcess
 import GPLVM.Types
@@ -63,6 +65,8 @@ testList = [ -5.0
            ,  5.0
            ]
 
+
+
 xTestDim :: DIM2
 xTestDim = (Z :. 50 :. 1)
 
@@ -72,27 +76,60 @@ xTestFunction (Z :. n :. _) = testList !! n
 xTest :: Matrix D Double
 xTest = fromFunction xTestDim xTestFunction
 
+xTest' :: Matrix D Double
+xTest' = delay $ fromUnboxed xTestDim (V.fromList testList)
+
 inputObserve :: InputObservations Double
-inputObserve = InputObservations xTest
+inputObserve = InputObservations xTest'
 
 foo :: Array D DIM2 Double -> Array U DIM2 Double
 foo = computeS @D @_ @_ @U
 
-matrixSquare :: Matrix D Double -> Matrix D Double
-matrixSquare matrix = smap ((flip (^)) 2) matrix
+matrixSub
+    :: Num a
+    => Vector D a
+    -> Matrix D a
+    -> Matrix D a
+matrixSub vec@(ADelayed (Z :. len) f) matrix@(ADelayed (Z :. rows :. cols) g) =
+    case (rows == len) of
+        False -> error "matrixSub: length of vector should be equal to the number of rows"
+        True -> delay $ newMatrix -^ matrix
+    where
+        newMatrix = fromFunction (Z :. rows :. cols) subFunction
+        subFunction (Z :. rows' :. cols') = f (Z :. rows')
 
-fun :: Double -> Double
-fun = exp . ((*) (-0.5)) . ((*) 10)
+matrixSum
+    :: Num a
+    => Vector D a
+    -> Matrix D a
+    -> Matrix D a
+matrixSum vec@(ADelayed (Z :. len) f) matrix@(ADelayed (Z :. rows :. cols) g) =
+    case (rows == len) of
+        False -> error "matrixSub: length of vector should be equal to the number of rows"
+        True -> delay $ newMatrix +^ matrix
+    where
+        newMatrix = fromFunction (Z :. rows :. cols) sumFunction
+        sumFunction (Z :. rows' :. cols') = f (Z :. rows')
 
 sqDist :: Matrix D Double -> Matrix D Double -> Matrix D Double
-sqDist matrix1 matrix2 = matrixSquare matrix1 +^ matrix2'
+sqDist matrix1 matrix2 = (toVector . matrixSquare $ matrix1) `matrixSum` matrix2'
      where
-       matrix2' = matrixSquare matrix2 -^
-                  (delay $ smap ((*) 2) $ matrix1 `mulS` (transposeMatrix matrix2))
+         matrix2' = (toVector . matrixSquare $ matrix2) `matrixSub`
+                      ((delay . smap ((*) 2)) $ matrix1 `mulS` (transposeMatrix matrix2))
+         matrixSquare matrix = smap flipExp matrix
+         flipExp = (flip (^)) 2
+
+toVector :: Matrix D a -> Vector D a
+toVector matrix@(ADelayed (Z :. rows :. cols) f) =
+    case cols == 1 of
+        True -> fromFunction (Z :. rows) (\(Z :. x) -> f (Z :. x :. 1))
+        False -> error "col should be single"
 
 kernelFunction :: KernelFunction Double
 kernelFunction matrix1 matrix2 =
     smap fun $ sqDist matrix1 matrix2
+    where
+        fun = exp . ((*) (-0.5)) . ((*) (1/0.1))
 
 xTrainList :: [Double]
 xTrainList = [-4, -3, -2, -1, 1]
@@ -101,7 +138,7 @@ xTrainFunction :: DIM2 -> Double
 xTrainFunction (Z :. n :. _) = xTrainList !! n
 
 xTrain :: Matrix D Double
-xTrain = fromFunction (Z :. 5 :. 1) xTrainFunction
+xTrain = delay $ fromUnboxed xTestDim (V.fromList xTrainList)
 
 yTrain :: Matrix D Double
 yTrain = smap sin xTrain

@@ -7,7 +7,7 @@ module GPLVM.Util
        , updateMatrix2
        ) where
 
-import Universum hiding (transpose)
+import Universum hiding (Vector, transpose)
 
 import Data.Array.Repa
 import Data.Array.Repa.Repr.Unboxed (Unbox)
