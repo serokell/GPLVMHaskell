@@ -80,7 +80,9 @@ matrixSub
     -> Matrix D a
     -> Matrix D a
 matrixSub vec@(ADelayed (Z :. len) f) matrix@(ADelayed (Z :. rows :. cols) g) =
-    delay $ newMatrix -^ matrix
+    case (rows == len) of
+        False -> error "matrixSub: length of vector should be equal to the number of rows"
+        True -> delay $ newMatrix -^ matrix
     where
         newMatrix = fromFunction (Z :. rows :. cols) subFunction
         subFunction (Z :. rows' :. cols') = f (Z :. rows')
@@ -91,7 +93,9 @@ matrixSum
     -> Matrix D a
     -> Matrix D a
 matrixSum vec@(ADelayed (Z :. len) f) matrix@(ADelayed (Z :. rows :. cols) g) =
-    newMatrix +^ matrix
+    case (rows == len) of
+        False -> error "matrixSub: length of vector should be equal to the number of rows"
+        True -> delay $ newMatrix +^ matrix
     where
         newMatrix = fromFunction (Z :. rows :. cols) sumFunction
         sumFunction (Z :. rows' :. cols') = f (Z :. rows')
@@ -117,10 +121,60 @@ kernelFunction matrix1 matrix2 =
         fun = exp . ((*) (-0.5)) . ((*) (1/0.1))
 
 xTrainList :: [Double]
-xTrainList = [-4, -3, -2, -1, 1]
+xTrainList =
+    [ -4.0
+    ,-3.83673469
+    ,-3.67346939
+    ,-3.51020408
+    ,-3.34693878
+    ,-3.18367347
+    ,-3.02040816
+    ,-2.85714286
+    ,-2.69387755
+    ,-2.53061224
+    ,-2.36734694
+    ,-2.20408163
+    ,-2.04081633
+    ,-1.87755102
+    ,-1.71428571
+    ,-1.55102041
+    ,-1.3877551
+    ,-1.2244898
+    ,-1.06122449
+    ,-0.89795918
+    ,-0.73469388
+    ,-0.57142857
+    ,-0.40816327
+    ,-0.24489796
+    ,-8.163265e-2
+    ,8.163265e-2
+    ,0.24489796
+    ,0.40816327
+    ,0.57142857
+    ,0.73469388
+    ,0.89795918
+    ,1.06122449
+    ,1.2244898
+    ,1.3877551
+    ,1.55102041
+    ,1.71428571
+    ,1.87755102
+    ,2.04081633
+    ,2.20408163
+    ,2.36734694
+    ,2.53061224
+    ,2.69387755
+    ,2.85714286
+    ,3.02040816
+    ,3.18367347
+    ,3.34693878
+    ,3.51020408
+    ,3.67346939
+    ,3.83673469
+    ,4.0]
 
 xTrain :: Matrix D Double
-xTrain = delay $ fromUnboxed (Z :. 5 :. 1) (V.fromList xTrainList)
+xTrain = delay $ fromUnboxed (Z :. 50 :. 1) (V.fromList xTrainList)
 
 yTrain :: Matrix D Double
 yTrain = smap sin xTrain
