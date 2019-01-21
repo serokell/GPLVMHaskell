@@ -12,7 +12,7 @@ module GPLVM.GaussianProcess
        , testValueCovariaceMatrix
        ) where
 
-import Universum hiding (transpose)
+import Universum hiding (transpose, Vector)
 
 import Control.Lens (makeLenses)
 
@@ -21,19 +21,20 @@ import Data.Array.Repa.Repr.Unboxed (Unbox)
 import Numeric.LinearAlgebra.Repa hiding (Matrix, Vector)
 import System.Random (Random, RandomGen)
 
-import GPLVM.Types (InputObservations(..), KernelFunction, Matrix, unInputObs)
-import GPLVM.Util (randomMatrixD)
+import GPLVM.Types (InputObservations(..), KernelFunction, Matrix,
+                    Vector, unInputObs)
+import GPLVM.Util
 
-type GPMean a = Matrix D a -> Matrix D a
+type GPMean a = Vector D a -> Vector D a
 
 data GaussianProcess a = GaussianProcess
-    { _kernelGP :: KernelFunction a
+    { _kernelGP :: Vector D a -> Vector D a -> Matrix D a
     , _meanGP ::  GPMean a
     }
 
 data GPTrainingData a = GPTrainingData
-    { _inputTrain :: Matrix D a
-    , _outputTrain :: Matrix D a
+    { _inputTrain :: Vector D a
+    , _outputTrain :: Vector D a
     }
 
 makeLenses ''GaussianProcess
@@ -45,7 +46,7 @@ newtype PosteriorSample a = PosteriorSample { unSample :: Matrix D a }
 -- (just apply kernel function)
 
 testValueCovariaceMatrix
-    :: forall a. GaussianProcess a
+    :: GaussianProcess a
     -> InputObservations a
     -> Matrix D a
 testValueCovariaceMatrix gP observations = kernelMatrix
@@ -103,7 +104,7 @@ gpToPosteriorSample inputObserve gP trainingData gen sampleNumber = do
     cholKSolve <- linearSolveS cholK testPointMean
 
         -- solve linear system for output training points
-    cholKSolveOut <- linearSolveS cholK (trainingData ^. outputTrain)
+    cholKSolveOut <- linearSolveS cholK (toMatrix $ (trainingData ^. outputTrain))
 
     let cholKSolve' = delay cholKSolve
     let cholKSolveOut' = delay cholKSolveOut

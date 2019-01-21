@@ -44,7 +44,7 @@ newtype LatentSpacePoints a = LatentSpacePoints { _unLatentSpacePoints :: Matrix
 makeLenses ''LatentSpacePoints
 
 
-newtype InputObservations a = InputObservations { _unInputObs :: Matrix D a }
+newtype InputObservations a = InputObservations { _unInputObs :: Vector D a }
     deriving Eq
 
 newtype ObservedData a = ObservedData { _unObservedData :: Matrix D a }

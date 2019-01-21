@@ -19,7 +19,7 @@ source-repository head
 
 library
   exposed-modules:
-      GPLVM.GPTest
+      GPLVM.GPExample
       GPLVM.GaussianProcess
       GPLVM.GaussianProcessLV
       GPLVM.PCA

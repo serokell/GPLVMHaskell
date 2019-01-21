@@ -6,11 +6,16 @@ module GPLVM.Util
        , updateMatrix
        , updateMatrix2
        , toMatrix
+       , toMatrix'
        , zipWithArray
        , (++^)
        , (**^)
        , (--^)
        , (//^)
+       , (^++)
+       , (^**)
+       , (^--)
+       , (^//)
        ) where
 
 import Universum hiding (Vector, transpose)
@@ -18,6 +23,7 @@ import Universum hiding (Vector, transpose)
 import Data.Array.Repa
 import Data.Array.Repa.Repr.Unboxed (Unbox)
 import Data.Array.Repa.Operators.Mapping as R
+import Data.Array.Repa.Shape (size)
 
 import Data.Random.Normal
 import Numeric.LinearAlgebra.Repa hiding (Matrix, Vector)
@@ -74,11 +80,20 @@ toMatrix
     => Array r1 DIM1 a
     -> Array D DIM2 a
 toMatrix arr =
-    fromFunction (Z :. (dimToInt . extent $ arr) :. (dimToInt . extent $ arr)) generator
+    fromFunction (Z :. newDimension :. newDimension) generator
     where
         generator (Z :. rows :. cols) = linearIndex arr cols
-        dimToInt :: DIM1 -> Int
-        dimToInt (Z :. x) = x
+        newDimension = size . extent $ arr
+
+toMatrix'
+    :: Source r1 a
+    => Array r1 DIM1 a
+    -> Array D DIM2 a
+toMatrix' arr =
+    fromFunction (Z :. dimension :. 1) generator
+    where
+        dimension = size . extent $ arr
+        generator (Z :. rows :. cols) = linearIndex arr rows
 
 zipWithArray
     :: (a -> b -> c)
@@ -110,3 +125,19 @@ infixl 7 //^
 (**^) = zipWithArray (*)
 (--^) = zipWithArray (-)
 (//^) = zipWithArray (/)
+
+infixl 6 ^++
+infixl 6 ^--
+infixl 7 ^**
+infixl 7 ^//
+
+
+(^++), (^**), (^--), (^//)
+    :: (Num a, Fractional a)
+    => Array D DIM2 a
+    -> Array D DIM1 a
+    -> Array D DIM2 a
+(^++) = zipWithArray' (+)
+(^**) = zipWithArray' (*)
+(^--) = zipWithArray' (-)
+(^//) = zipWithArray' (/)
