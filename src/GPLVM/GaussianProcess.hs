@@ -104,7 +104,7 @@ gpToPosteriorSample inputObserve gP trainingData gen sampleNumber = do
     cholKSolve <- linearSolveS cholK testPointMean
 
         -- solve linear system for output training points
-    cholKSolveOut <- linearSolveS cholK (toMatrix $ (trainingData ^. outputTrain))
+    cholKSolveOut <- linearSolveS cholK (toMatrix' $ (trainingData ^. outputTrain))
 
     let cholKSolve' = delay cholKSolve
     let cholKSolveOut' = delay cholKSolveOut

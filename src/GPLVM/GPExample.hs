@@ -80,7 +80,7 @@ sqDist
     :: Vector D Double
     -> Vector D Double
     -> Matrix D Double
-sqDist vec1 vec2 = matrixSquare vec1 ++^ matrix2'
+sqDist vec1 vec2 = matrixSquare vec1 ++^ (transposeMatrix matrix2')
      where
          matrix2' = matrixSquare vec2 --^
                       ((delay . smap ((*) 2)) $
