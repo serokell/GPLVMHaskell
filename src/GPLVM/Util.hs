@@ -81,7 +81,7 @@ toMatrix
     -> Int
     -> Array D DIM2 a
 toMatrix arr newCols =
-    fromFunction (Z :. newDimension :. newCols) generator
+    fromFunction (Z :. newCols :. newDimension) generator
     where
         generator (Z :. rows :. cols) = linearIndex arr cols
         newDimension = size . extent $ arr
@@ -102,7 +102,7 @@ zipWithArray
     -> Array D DIM2 b
     -> Array D DIM2 c
 zipWithArray f array1 array2@(ADelayed (Z :. rows :. cols) g) =
-    transposeMatrix $ R.zipWith f (toMatrix array1 rows) (transposeMatrix array2)
+    R.zipWith f (toMatrix array1 rows) array2
 
 zipWithArray'
     :: (a -> b -> c)
@@ -110,7 +110,7 @@ zipWithArray'
     -> Array D DIM1 b
     -> Array D DIM2 c
 zipWithArray' f array1@(ADelayed (Z :. rows :. cols) g) array2 =
-    transposeMatrix $ R.zipWith f (transposeMatrix array1) (toMatrix array2 rows)
+    R.zipWith f array1 (toMatrix array2 rows)
 
 infixl 6 ++^
 infixl 6 --^
