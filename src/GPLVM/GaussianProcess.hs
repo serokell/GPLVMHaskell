@@ -8,8 +8,6 @@ module GPLVM.GaussianProcess
        , functionalPrior
        , gpToPosteriorSample
        , kernelGP
-       , meanGP
-       , testValueCovariaceMatrix
        ) where
 
 import Universum hiding (transpose, Vector)
@@ -25,11 +23,10 @@ import GPLVM.Types (InputObservations(..), KernelFunction, Matrix,
                     Vector, unInputObs)
 import GPLVM.Util
 
-type GPMean a = Vector D a -> Vector D a
+type GPMean a = Vector D a -> Matrix D a
 
 data GaussianProcess a = GaussianProcess
     { _kernelGP :: Vector D a -> Vector D a -> Matrix D a
-    , _meanGP ::  GPMean a
     }
 
 data GPTrainingData a = GPTrainingData
@@ -41,19 +38,6 @@ makeLenses ''GaussianProcess
 makeLenses ''GPTrainingData
 
 newtype PosteriorSample a = PosteriorSample { unSample :: Matrix D a }
-
--- covariance between gP input and gP output
--- (just apply kernel function)
-
-testValueCovariaceMatrix
-    :: GaussianProcess a
-    -> InputObservations a
-    -> Matrix D a
-testValueCovariaceMatrix gP observations = kernelMatrix
-    where
-        kernelMatrix = kernelFun points points
-        kernelFun = gP ^. kernelGP
-        points = observations ^. unInputObs
 
 type GPConstraint a =
     ( Field a
@@ -88,30 +72,29 @@ gpToPosteriorSample
     -> g
     -> Int
     -> Maybe (PosteriorSample a)
-gpToPosteriorSample inputObserve gP trainingData gen sampleNumber = do
-    let covarianceMatrix = testValueCovariaceMatrix gP inputObserve
-        -- get covariance matrix for test inputs
-    let inputTrain' = trainingData ^. inputTrain
+gpToPosteriorSample (InputObservations observe) gP trainingData gen sampleNumber = do
+        -- kernel applied to input test points (so-called K_ss)
+    let covarianceMatrix = kernel observe observe
 
-        -- kernel applied to input training points
-    let trainingKernel = (gP ^. kernelGP) inputTrain' inputTrain'
-        -- Cholesky decomposition applied to kernel of training points
-    let cholK = cholSH trainingKernel
+        -- kernel applied to input training points (so-called K)
+    let trainingKernel = kernel inputTrain' inputTrain'
+        -- Cholesky decomposition applied to kernel of training points (:)
+    let cholK = cholSH (trainingKernel +^ ((delay . smap (* 0.00005)) $
+                        ident . size . extent $ inputTrain'))
 
-        -- test points mean
-    let testPointMean = (gP ^. kernelGP) (inputObserve ^. unInputObs) inputTrain'
+        -- covariance between test points and input training points (so-called K_s)
+    let testPointMean = kernel observe inputTrain'
 
+        -- (roots of L * x = K_s)
     cholKSolve <- linearSolveS cholK testPointMean
 
         -- solve linear system for output training points
-    cholKSolveOut <- linearSolveS cholK (toMatrix' $ (trainingData ^. outputTrain))
-
-    let cholKSolve' = delay cholKSolve
-    let cholKSolveOut' = delay cholKSolveOut
-    let mulD m n = delay (mulS m n)
+    cholKSolveOut <- linearSolveS cholK (toMatrix' $ outputTrain')
 
         -- compute mean
-    let mean = transpose cholKSolve' `mulD` cholKSolveOut'
+    let mean = (transposeMatrix . delay $ cholKSolve) `mulD` (delay cholKSolveOut)
+
+        -- compute standard deviation
 
         -- posterior
     let postF' = cholSH $
@@ -119,3 +102,8 @@ gpToPosteriorSample inputObserve gP trainingData gen sampleNumber = do
                      (transpose cholKSolve' `mulD` cholKSolve')
     let prior = functionalPrior postF' gen sampleNumber
     return $ PosteriorSample $ mean +^ prior
+    where
+       kernel = gP ^. kernelGP
+       inputTrain' = trainingData ^. inputTrain
+       outputTrain' = trainingData ^. outputTrain
+       mulD m n = delay $ m `mulS` n

@@ -117,8 +117,11 @@ yTrain = smap sin xTrain
 testTrainingData :: GPTrainingData Double
 testTrainingData = GPTrainingData xTrain yTrain
 
-meanTest :: GPMean Double
-meanTest matrix = undefined
+k, kS, l, lK :: Matrix D Double
+k = kernelFunction xTrain xTrain
+kS = kernelFunction xTrain xTest
+l = cholSH (k +^ (delay . smap (* 0.0005) $ identD 50))
+lK = fromMaybe (error "izviniti") (delay <$> linearSolveS l kS)
 
 testGaussianProcess :: GaussianProcess Double
-testGaussianProcess = GaussianProcess kernelFunction meanTest
+testGaussianProcess = GaussianProcess kernelFunction

@@ -25,7 +25,7 @@ import Data.Array.Repa.Repr.Unboxed (Unbox)
 import Data.Array.Repa.Operators.Mapping as R
 import Data.Array.Repa.Shape (size)
 
-import Data.Random.Normal
+import Data.Random.Normal (normals)
 import Numeric.LinearAlgebra.Repa hiding (Matrix, Vector)
 import System.Random (Random, RandomGen)
 
