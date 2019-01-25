@@ -2,7 +2,6 @@
 
 module GPLVM.GaussianProcess
        ( GaussianProcess (..)
-       , GPMean
        , GPTrainingData (..)
        , PosteriorSample (..)
        , functionalPrior
@@ -17,13 +16,11 @@ import Control.Lens (makeLenses)
 import Data.Array.Repa
 import Data.Array.Repa.Repr.Unboxed (Unbox)
 import Numeric.LinearAlgebra.Repa hiding (Matrix, Vector)
-import System.Random (Random, RandomGen)
+import System.Random (Random, RandomGen, mkStdGen)
 
 import GPLVM.Types (InputObservations(..), KernelFunction, Matrix,
                     Vector, unInputObs)
 import GPLVM.Util
-
-type GPMean a = Vector D a -> Matrix D a
 
 data GaussianProcess a = GaussianProcess
     { _kernelGP :: Vector D a -> Vector D a -> Matrix D a
@@ -64,15 +61,13 @@ gpToPosteriorSample
     :: forall a g.
     ( GPConstraint a
     , Eq a
-    , RandomGen g
     )
     => InputObservations a
     -> GaussianProcess a
     -> GPTrainingData a
-    -> g
     -> Int
     -> Maybe (PosteriorSample a)
-gpToPosteriorSample (InputObservations observe) gP trainingData gen sampleNumber = do
+gpToPosteriorSample (InputObservations observe@(ADelayed (Z :. len) _)) gP trainingData sampleNumber = do
         -- kernel applied to input test points (so-called K_ss)
     let covarianceMatrix = kernel observe observe
 
@@ -86,24 +81,26 @@ gpToPosteriorSample (InputObservations observe) gP trainingData gen sampleNumber
     let testPointMean = kernel observe inputTrain'
 
         -- (roots of L * x = K_s)
-    cholKSolve <- linearSolveS cholK testPointMean
+    cholKSolve <- delay <$> linearSolveS cholK testPointMean
 
         -- solve linear system for output training points
-    cholKSolveOut <- linearSolveS cholK (toMatrix' $ outputTrain')
-
+    cholKSolveOut <- delay <$> linearSolveS cholK (toMatrix' $ outputTrain')
         -- compute mean
-    let mean = (transposeMatrix . delay $ cholKSolve) `mulD` (delay cholKSolveOut)
+    let mean = (transposeMatrix cholKSolve) `mulD` (cholKSolveOut)
 
         -- compute standard deviation
-
+{-
+    let standardDeviation = ((delay . smap sqrt) $ (takeDiagD covarianceMatrix)) --^ ((delay . sumS) $ smap flipExp cholKSolve)
+-}
         -- posterior
     let postF' = cholSH $
-                     covarianceMatrix -^
-                     (transpose cholKSolve' `mulD` cholKSolve')
-    let prior = functionalPrior postF' gen sampleNumber
+                     covarianceMatrix +^ ((smap (* 1.0e-6) (identD len)) -^
+                                          (transposeMatrix cholKSolve) `mulS` cholKSolve)
+    let prior = functionalPrior postF' (mkStdGen (-1)) sampleNumber
     return $ PosteriorSample $ mean +^ prior
     where
        kernel = gP ^. kernelGP
        inputTrain' = trainingData ^. inputTrain
        outputTrain' = trainingData ^. outputTrain
        mulD m n = delay $ m `mulS` n
+       flipExp = (flip (^)) 2
