@@ -51,6 +51,7 @@ library
                        -fno-warn-orphans
   default-extensions: NoImplicitPrelude
                       RankNTypes
+                      BangPatterns
                       TemplateHaskell
                       TypeFamilies
                       GADTs
