@@ -66,7 +66,7 @@ gpToPosteriorSample
     -> GaussianProcess a
     -> GPTrainingData a
     -> Int
-    -> Maybe (PosteriorSample a, Vector D a)  -- returns posterior functional prior and standard deviation
+    -> Maybe (PosteriorSample a)  -- returns posterior functional prior and standard deviation
 gpToPosteriorSample (InputObservations observe@(ADelayed (Z :. len) _)) gP trainingData sampleNumber = do
         -- kernel applied to input test points (so-called K_ss)
     let covarianceMatrix = kernel observe observe
@@ -75,8 +75,8 @@ gpToPosteriorSample (InputObservations observe@(ADelayed (Z :. len) _)) gP train
     let trainingKernel = kernel inputTrain' inputTrain'
 
         -- Cholesky decomposition applied to kernel of training points (:), so-called L
-    let cholK = cholSH (trainingKernel +^ ((delay . smap (* 0.00005)) $
-                        ident . size . extent $ inputTrain'))
+    let cholK = cholSH $ trainingKernel +^
+                (smap (* 0.00005) . identD . size . extent $ inputTrain')
 
         -- covariance between test points and input training points (so-called K_s)
     let testPointMean = kernel observe inputTrain'
@@ -85,20 +85,19 @@ gpToPosteriorSample (InputObservations observe@(ADelayed (Z :. len) _)) gP train
     cholKSolve <- delay <$> linearSolveS cholK testPointMean
 
         -- solve linear system for output training points
-    cholKSolveOut <- transposeMatrix . delay <$> linearSolveS cholK (toMatrix' $ outputTrain')
+    cholKSolveOut <- delay <$> linearSolveS cholK (transposeMatrix $ toMatrix outputTrain' len)
         -- compute mean
-    let mean = cholKSolveOut `mulD` cholKSolve
+    let mean = (transposeMatrix cholKSolveOut) `mulD` cholKSolve
 
         -- compute standard deviation
 
-    let standardDeviation = ((delay . smap sqrt) $ (takeDiagD covarianceMatrix)) -^ ((delay . sumS) $ smap flipExp (transposeMatrix cholKSolve))
-
         -- posterior
     let postF' = cholSH $
-                     covarianceMatrix +^ ((smap (* 1.0e-6) (identD len)) -^
-                                          (transposeMatrix cholKSolve) `mulS` cholKSolve)
-    let prior = functionalPrior postF' (mkStdGen 0) sampleNumber
-    return $ (PosteriorSample $ mean +^ prior, standardDeviation)
+                     covarianceMatrix +^
+                     ((smap (* 1.0e-6) (identD len)) -^
+                     (transposeMatrix cholKSolve) `mulD` cholKSolve)
+    let prior = functionalPrior postF' (mkStdGen 1) sampleNumber
+    return $ (PosteriorSample $ mean +^ prior)
     where
        kernel = gP ^. kernelGP
        inputTrain' = trainingData ^. inputTrain
