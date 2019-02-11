@@ -26,6 +26,7 @@ library
       GPLVM.IVM
       GPLVM.Types
       GPLVM.Util
+      Math.TestDimensions
   other-modules:
       Paths_GPLVMHaskell
       Math.Matrix
@@ -35,6 +36,7 @@ library
       base >=4.7 && <5
     , containers
     , lens
+    , dimensions
     , mtl
     , normaldistribution
     , random
@@ -61,6 +63,7 @@ library
                       TypeOperators
                       TypeApplications
                       RecordWildCards
+                      MultiWayIf
 
 executable GPLVMHaskell-exe
   main-is: Main.hs
