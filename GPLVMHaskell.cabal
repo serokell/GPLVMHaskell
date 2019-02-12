@@ -27,6 +27,7 @@ library
       GPLVM.IVM
       GPLVM.Types
       GPLVM.Util
+      Math.TestDimensions
   other-modules:
       Paths_GPLVMHaskell
       Math.Matrix
@@ -36,11 +37,13 @@ library
       base >=4.7 && <5
     , containers
     , lens
+    , dimensions
     , mtl
     , normaldistribution
     , random
     , repa
     , repa-linear-algebra
+    , repa-algorithms
     , statistics
     , vector
     , universum
@@ -51,6 +54,7 @@ library
                        -fno-warn-orphans
   default-extensions: NoImplicitPrelude
                       RankNTypes
+                      BangPatterns
                       TemplateHaskell
                       TypeFamilies
                       GADTs
@@ -60,6 +64,7 @@ library
                       TypeOperators
                       TypeApplications
                       RecordWildCards
+                      MultiWayIf
 
 executable GPLVMHaskell-exe
   main-is: Main.hs
@@ -72,10 +77,20 @@ executable GPLVMHaskell-exe
       GPLVMHaskell
     , base >=4.7 && <5
     , universum
+    , attoparsec
+    , random 
+    , repa 
   default-language: Haskell2010
   ghc-options:         -Wall
                        -fno-warn-orphans
-  default-extensions:   NoImplicitPrelude
-                        TemplateHaskell
-                        TypeApplications
-                        OverloadedStrings
+  default-extensions: RankNTypes
+                      TemplateHaskell
+                      TypeFamilies
+                      GADTs
+                      DataKinds
+                      OverloadedStrings
+                      ScopedTypeVariables
+                      TypeOperators
+                      TypeApplications
+                      RecordWildCards
+                      NoImplicitPrelude
