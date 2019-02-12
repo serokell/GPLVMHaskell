@@ -46,6 +46,7 @@ library
     , repa-algorithms
     , statistics
     , vector
+    , vinyl
     , universum
   build-tool-depends:
       autoexporter:autoexporter
@@ -78,8 +79,8 @@ executable GPLVMHaskell-exe
     , base >=4.7 && <5
     , universum
     , attoparsec
-    , random 
-    , repa 
+    , random
+    , repa
   default-language: Haskell2010
   ghc-options:         -Wall
                        -fno-warn-orphans

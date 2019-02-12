@@ -14,7 +14,6 @@ module GPLVM.Util
        , transposeMatrix
        , updateMatrix
        , updateMatrix2
-<<<<<<< HEAD
        , toMatrix
        , toMatrix'
        , zipWithArray
@@ -26,15 +25,6 @@ module GPLVM.Util
        , (^**)
        , (^--)
        , (^//)
-       ) where
-
-import Universum hiding (Vector, transpose)
-
-import Data.Array.Repa
-import Data.Array.Repa.Repr.Unboxed (Unbox)
-import Data.Array.Repa.Operators.Mapping as R
-import Data.Array.Repa.Shape (size)
-=======
        , (^--)
        ) where
 
@@ -46,10 +36,8 @@ import Data.Array.Repa
 import Data.Array.Repa.Repr.Unboxed (Unbox)
 import Data.Array.Repa.Shape (size)
 import Data.List ((!!), (\\))
->>>>>>> ai-11-pca-and-ppca-in-haskell
-
 import Data.Random.Normal (normals)
-import Numeric.LinearAlgebra.Repa hiding (Matrix, Vector)
+import Numeric.LinearAlgebra.Repa hiding (Matrix, Vector, diag)
 import System.Random (Random, RandomGen)
 
 import GPLVM.Types

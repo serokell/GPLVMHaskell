@@ -11,6 +11,8 @@ import Prelude (log)
 import Universum hiding (All, Any, Vector, map, natVal, toList, transpose)
 
 import Data.Array.Repa.Algorithms.Matrix
+import Data.Vinyl.TypeLevel (AllConstrained)
+
 import Numeric.LinearAlgebra.Repa hiding (Matrix, Vector)
 import System.Random
 import Unsafe.Coerce
@@ -19,6 +21,8 @@ import Unsafe.Coerce
 --TypeFamily MulMatr Dim
 
 newtype DimMatrix r (y :: Nat) (x :: Nat) = DimMatrix { getInternal :: Matrix r Double}
+
+newtype DimVector r (x :: Nat) = DimVector { runVector :: Vector r Double }
 
 data PPCA = PPCA
   {  _learningData        :: Matrix D Double
@@ -40,10 +44,10 @@ withMat m f =
 makePPCATypeSafe
   :: RandomGen gen
   => Matrix D Double   -- ^ learning vectors
-  -> Int               -- ^ desired dimention
+  -> Int               -- ^ desired dimension
   -> Either Int Double -- ^ number of iterations or
                        --   the value of stop difference of the likelihood expectation between interations of EM.
-  -> (forall d x1 y1 x2 y2 . (KnownNat d, KnownNat x1, KnownNat y1, KnownNat x2, KnownNat y2, x2 ~ d, y1 ~ y2)
+  -> (forall d x1 y1 x2 y2 . (AllConstrained KnownNat [d, x1, y1, x2, y2], x2 ~ d, y1 ~ y2)
       => DimMatrix D y1 x1 -> DimMatrix D y2 x2 -> Double -> Either Int Double -> (DimMatrix D y2 x2, Double, Double))
   -> gen
   -> PPCA
@@ -61,7 +65,7 @@ makePPCATypeSafe leaningVectors desiredDimentions stopParameter func generator =
 
 inferPPCAInputMatrices
   :: forall d y1 y2 x2.
-  (KnownNat d, KnownNat y1, KnownNat y2, KnownNat x2)
+  AllConstrained KnownNat [d, y1, y2, x2]
   => Evidence (x2 ~ d, y1 ~ y2)
 inferPPCAInputMatrices
   | natVal (Proxy :: Proxy y1) /= natVal (Proxy :: Proxy y2) =
@@ -71,7 +75,10 @@ inferPPCAInputMatrices
   | otherwise = unsafeCoerce (E @((y1 ~ y1), (y1 ~ y1)))
 
 mulM
-  :: forall y1 x1 y2 x2 . (KnownNat x1, KnownNat x2, KnownNat y1, KnownNat y2, x1 ~ y2)
+  :: forall y1 x1 y2 x2.
+  ( AllConstrained KnownNat [x1, x2, y1, y2]
+  , x1 ~ y2
+  )
   => DimMatrix D y1 x1 -> DimMatrix D y2 x2 -> DimMatrix D y1 x2
 mulM (DimMatrix m1) (DimMatrix m2) = DimMatrix $ delay $ m1 `mulS` m2
 
@@ -105,19 +112,30 @@ substractMeanM
   -> DimMatrix D y x
 substractMeanM (DimMatrix m) = DimMatrix $ substractMean m
 
-(+^^) :: forall y1 x1 y2 x2 . (KnownNat x1, KnownNat x2, KnownNat y1, KnownNat y2, x1 ~ x2, y1 ~ y2)
+(+^^) :: forall y1 x1 y2 x2.
+  ( AllConstrained KnownNat [x1, x2, y1, y2]
+  , x1 ~ x2
+  , y1 ~ y2
+  )
   => DimMatrix D y1 x1
   -> DimMatrix D y2 x2
   -> DimMatrix D y2 x2
 (+^^) (DimMatrix m1) (DimMatrix m2) = DimMatrix $ m1 +^ m2
 
-(-^^) :: forall y1 x1 y2 x2 . (KnownNat x1, KnownNat x2, KnownNat y1, KnownNat y2, x1 ~ x2, y1 ~ y2)
+(-^^) :: forall y1 x1 y2 x2.
+  ( AllConstrained KnownNat [x1, x2, y1, y2]
+  , x1 ~ x2
+  , y1 ~ y2)
   => DimMatrix D y1 x1
   -> DimMatrix D y2 x2
   -> DimMatrix D y2 x2
 (-^^) (DimMatrix m1) (DimMatrix m2) = DimMatrix $ m1 -^ m2
 
-(*^^) :: forall y1 x1 y2 x2 . (KnownNat x1, KnownNat x2, KnownNat y1, KnownNat y2, x1 ~ x2, y1 ~ y2)
+(*^^) :: forall y1 x1 y2 x2.
+  ( AllConstrained KnownNat [x1, x2, y1, y2]
+  , x1 ~ x2
+  , y1 ~ y2
+  )
   => DimMatrix D y1 x1
   -> DimMatrix D y2 x2
   -> DimMatrix D y2 x2
@@ -153,7 +171,12 @@ trace2SM :: (KnownNat y, KnownNat x)
 trace2SM (DimMatrix m) = trace2S $ computeS m
 
 emStepsFast
-  :: forall d y1 x1 y2 x2 . (HasCallStack, KnownNat y1, KnownNat y2, KnownNat x1, KnownNat x2, x2 ~ d, y1 ~ y2)
+  :: forall d y1 x1 y2 x2.
+  ( HasCallStack
+  , AllConstrained KnownNat [x1, x2, y1, y2]
+  , x2 ~ d
+  , y1 ~ y2
+  )
   => DimMatrix D y1 x1
   -> DimMatrix D y2 x2
   -> Double
