@@ -47,6 +47,8 @@ type GPConstraint a =
   , Eq a
   )
 
+-- | Main GP function: get a posterior sample by some kernel function, input observations and training data
+
 gpToPosteriorSample
   :: forall a g.
   GPConstraint a

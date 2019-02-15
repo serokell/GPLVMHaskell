@@ -28,6 +28,7 @@ library
       GPLVM.Types
       GPLVM.Util
       Math.TestDimensions
+      Math.TestDimensionsGP
   other-modules:
       Paths_GPLVMHaskell
       Math.Matrix

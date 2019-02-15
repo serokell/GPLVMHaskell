@@ -20,9 +20,8 @@ import Unsafe.Coerce
 
 --TypeFamily MulMatr Dim
 
-newtype DimMatrix r (y :: Nat) (x :: Nat) = DimMatrix { getInternal :: Matrix r Double}
-
-newtype DimVector r (x :: Nat) = DimVector { runVector :: Vector r Double }
+newtype DimMatrix r (y :: Nat) (x :: Nat) a
+  = DimMatrix { getInternal :: Matrix r a}
 
 data PPCA = PPCA
   {  _learningData        :: Matrix D Double
@@ -33,7 +32,7 @@ data PPCA = PPCA
    , _finalExpLikelihood  :: Double
    }
 
-withMat :: Matrix D Double -> (forall x y. (KnownNat x, KnownNat y) => DimMatrix D x y -> k) -> k
+withMat :: Matrix D Double -> (forall x y. (KnownNat x, KnownNat y) => DimMatrix D x y Double -> k) -> k
 withMat m f =
     let (Z :. x :. y) = extent m
     in
@@ -48,7 +47,11 @@ makePPCATypeSafe
   -> Either Int Double -- ^ number of iterations or
                        --   the value of stop difference of the likelihood expectation between interations of EM.
   -> (forall d x1 y1 x2 y2 . (AllConstrained KnownNat [d, x1, y1, x2, y2], x2 ~ d, y1 ~ y2)
-      => DimMatrix D y1 x1 -> DimMatrix D y2 x2 -> Double -> Either Int Double -> (DimMatrix D y2 x2, Double, Double))
+      => DimMatrix D y1 x1 Double
+      -> DimMatrix D y2 x2 Double
+      -> Double
+      -> Either Int Double
+      -> (DimMatrix D y2 x2 Double, Double, Double))
   -> gen
   -> PPCA
 makePPCATypeSafe leaningVectors desiredDimentions stopParameter func generator =
@@ -56,8 +59,8 @@ makePPCATypeSafe leaningVectors desiredDimentions stopParameter func generator =
       initMatrix = randomMatrixD generator (n, desiredDimentions) :: Matrix D Double
       initVariance = fromIntegral $ fst . next $ generator :: Double
       (_W, _variance, _finalExpLikelihood) =
-        withMat _learningData $ \(ld :: DimMatrix D y1 x1) ->
-        withMat initMatrix $ \(initM :: DimMatrix D y2 x2) ->
+        withMat _learningData $ \(ld :: DimMatrix D y1 x1 Double) ->
+        withMat initMatrix $ \(initM :: DimMatrix D y2 x2 Double) ->
         case someNatVal $ fromIntegral desiredDimentions of
           SomeNat (Proxy :: Proxy d) ->
              withEvidence (inferPPCAInputMatrices @d @y1 @y2 @x2) $ convertPPCATypeSafeData $ func @d ld initM initVariance stopParameter
@@ -79,37 +82,39 @@ mulM
   ( AllConstrained KnownNat [x1, x2, y1, y2]
   , x1 ~ y2
   )
-  => DimMatrix D y1 x1 -> DimMatrix D y2 x2 -> DimMatrix D y1 x2
+  => DimMatrix D y1 x1 Double
+  -> DimMatrix D y2 x2 Double
+  -> DimMatrix D y1 x2 Double
 mulM (DimMatrix m1) (DimMatrix m2) = DimMatrix $ delay $ m1 `mulS` m2
 
 transposeM
   :: (KnownNat y, KnownNat x)
-  => DimMatrix D y x
-  -> DimMatrix D x y
+  => DimMatrix D y x Double
+  -> DimMatrix D x y Double
 transposeM (DimMatrix m) = DimMatrix $ transpose m
 
 mapMM :: (KnownNat y, KnownNat x)
   => (Double -> Double)
-  -> DimMatrix D y x
-  -> DimMatrix D y x
+  -> DimMatrix D y x Double
+  -> DimMatrix D y x Double
 mapMM f (DimMatrix m) =  DimMatrix $ map f m
 
 mapDiagonalM :: (KnownNat y, KnownNat x)
   => (Double -> Double)
-  -> DimMatrix D y x
-  -> DimMatrix D y x
+  -> DimMatrix D y x Double
+  -> DimMatrix D y x Double
 mapDiagonalM f (DimMatrix m) = DimMatrix $ mapDiagonal f m
 
 invSM
   :: (KnownNat y, KnownNat x, y ~ x)
-  => DimMatrix D y x
-  -> DimMatrix D y x
+  => DimMatrix D y x Double
+  -> DimMatrix D y x Double
 invSM (DimMatrix m) = DimMatrix $ delay $ invS m
 
 substractMeanM
   :: (KnownNat y, KnownNat x)
-  => DimMatrix D y x
-  -> DimMatrix D y x
+  => DimMatrix D y x Double
+  -> DimMatrix D y x Double
 substractMeanM (DimMatrix m) = DimMatrix $ substractMean m
 
 (+^^) :: forall y1 x1 y2 x2.
@@ -117,18 +122,19 @@ substractMeanM (DimMatrix m) = DimMatrix $ substractMean m
   , x1 ~ x2
   , y1 ~ y2
   )
-  => DimMatrix D y1 x1
-  -> DimMatrix D y2 x2
-  -> DimMatrix D y2 x2
+  => DimMatrix D y1 x1 Double
+  -> DimMatrix D y2 x2 Double
+  -> DimMatrix D y2 x2 Double
 (+^^) (DimMatrix m1) (DimMatrix m2) = DimMatrix $ m1 +^ m2
 
 (-^^) :: forall y1 x1 y2 x2.
   ( AllConstrained KnownNat [x1, x2, y1, y2]
   , x1 ~ x2
-  , y1 ~ y2)
-  => DimMatrix D y1 x1
-  -> DimMatrix D y2 x2
-  -> DimMatrix D y2 x2
+  , y1 ~ y2
+  )
+  => DimMatrix D y1 x1 Double
+  -> DimMatrix D y2 x2 Double
+  -> DimMatrix D y2 x2 Double
 (-^^) (DimMatrix m1) (DimMatrix m2) = DimMatrix $ m1 -^ m2
 
 (*^^) :: forall y1 x1 y2 x2.
@@ -136,37 +142,37 @@ substractMeanM (DimMatrix m) = DimMatrix $ substractMean m
   , x1 ~ x2
   , y1 ~ y2
   )
-  => DimMatrix D y1 x1
-  -> DimMatrix D y2 x2
-  -> DimMatrix D y2 x2
+  => DimMatrix D y1 x1 Double
+  -> DimMatrix D y2 x2 Double
+  -> DimMatrix D y2 x2 Double
 (*^^) (DimMatrix m1) (DimMatrix m2) = DimMatrix $ m1 *^ m2
 
 cholM
   :: (KnownNat y, KnownNat x, y ~ x)
-  => DimMatrix D y x
-  -> DimMatrix D y x
+  => DimMatrix D y x Double
+  -> DimMatrix D y x Double
 cholM (DimMatrix m) = DimMatrix $ delay $ chol $ trustSym $ computeS m
 
 sumAllSM
   :: (KnownNat y, KnownNat x)
-  => DimMatrix D y x
+  => DimMatrix D y x Double
   -> Double
 sumAllSM (DimMatrix m) = sumAllS m
 
 foldAllSM :: (KnownNat y, KnownNat x)
   => (Double -> Double -> Double)
   -> Double
-  -> DimMatrix D y x
+  -> DimMatrix D y x Double
   -> Double
 foldAllSM f initValue (DimMatrix m) = foldAllS f initValue m
 
 detSM :: (KnownNat y, KnownNat x)
-  => DimMatrix D y x
+  => DimMatrix D y x Double
   -> Double
 detSM (DimMatrix m) = detS m
 
 trace2SM :: (KnownNat y, KnownNat x)
-  => DimMatrix D y x
+  => DimMatrix D y x Double
   -> Double
 trace2SM (DimMatrix m) = trace2S $ computeS m
 
@@ -177,17 +183,21 @@ emStepsFast
   , x2 ~ d
   , y1 ~ y2
   )
-  => DimMatrix D y1 x1
-  -> DimMatrix D y2 x2
+  => DimMatrix D y1 x1 Double
+  -> DimMatrix D y2 x2 Double
   -> Double
   -> Either Int Double
-  -> (DimMatrix D y2 x2, Double, Double)
+  -> (DimMatrix D y2 x2 Double, Double, Double)
 emStepsFast learnMatrix initMatrix initVariance stopParam =
   let learnMatrixCentered = transposeM $ substractMeanM (transposeM learnMatrix)
       n = natVal (Proxy :: Proxy x1)
       d3 = natVal (Proxy :: Proxy y2)
 
-      stepOne :: (HasCallStack) => DimMatrix D y2 x2 -> Double -> Int -> (DimMatrix D y2 x2, Double, Double)
+      stepOne :: (HasCallStack)
+              => DimMatrix D y2 x2 Double
+              -> Double
+              -> Int
+              -> (DimMatrix D y2 x2 Double, Double, Double)
       stepOne (!oldW) oldVariance iteration =
         let m = mapDiagonalM (oldVariance +) $ (transposeM oldW) `mulM` oldW
             invM = invSM m
@@ -199,11 +209,11 @@ emStepsFast learnMatrix initMatrix initVariance stopParam =
       stepTwo
         :: forall y12 x12 y22 x22 y32 x32 y42 x42 y52 x52 .
            (HasCallStack, x42 ~ d, y12 ~ d, x22 ~ d, y22 ~ d, x32 ~ d, x12 ~ x1, y32 ~ y2, x52 ~ d, y2 ~ y52, y42 ~ y52)
-           => (DimMatrix D y12 x12, DimMatrix D y22 x22, DimMatrix D y32 x32)
-           -> DimMatrix D y42 x42
+           => (DimMatrix D y12 x12 Double, DimMatrix D y22 x22 Double, DimMatrix D y32 x32 Double)
+           -> DimMatrix D y42 x42 Double
            -> Double
            -> Int
-           -> (DimMatrix D y52 x52, Double, Double)
+           -> (DimMatrix D y52 x52 Double, Double, Double)
       stepTwo (expEznZ, expZtrZ, expXnEZnZ) oldW oldVariance iteration =
         let newW = expXnEZnZ `mulM` (invSM expZtrZ)
             u = cholM expZtrZ
@@ -229,6 +239,6 @@ emStepsFast learnMatrix initMatrix initVariance stopParam =
 
 convertPPCATypeSafeData
   :: (KnownNat y, KnownNat x)
-  => (DimMatrix D y x, Double, Double)
+  => (DimMatrix D y x Double, Double, Double)
   -> (Matrix D Double, Double, Double)
 convertPPCATypeSafeData ((DimMatrix w), variance, expLogLikelihood) = (w, variance, expLogLikelihood)
