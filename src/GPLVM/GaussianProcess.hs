@@ -17,8 +17,7 @@ import Data.Array.Repa.Repr.Unboxed (Unbox)
 import Numeric.LinearAlgebra.Repa hiding (Matrix, Vector)
 import System.Random (Random, RandomGen, mkStdGen)
 
-import GPLVM.Types (InputObservations(..), KernelFunction, Matrix,
-                    Vector, unInputObs)
+import GPLVM.Types (InputObservations(..), Matrix, Vector, unInputObs)
 import GPLVM.Util
 
 data GaussianProcess a = GaussianProcess

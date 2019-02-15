@@ -3,7 +3,6 @@ module GPLVM.Types
        , Distribution
        , EigenVectors
        , InputObservations (..)
-       , KernelFunction
        , LatentSpacePoints (..)
        , Matrix (..)
        , Mean (..)
@@ -43,7 +42,6 @@ newtype LatentSpacePoints a = LatentSpacePoints { _unLatentSpacePoints :: Matrix
 
 makeLenses ''LatentSpacePoints
 
-
 newtype InputObservations a = InputObservations { _unInputObs :: Vector D a }
     deriving Eq
 
@@ -52,5 +50,3 @@ newtype ObservedData a = ObservedData { _unObservedData :: Matrix D a }
 
 makeLenses ''ObservedData
 makeLenses ''InputObservations
-
-type KernelFunction a = Matrix D a -> Matrix D a -> Matrix D a

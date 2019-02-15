@@ -1,3 +1,5 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
+
 module Math.TestDimensions where
 
 import Data.Array.Repa hiding ((++))
@@ -11,7 +13,10 @@ import Prelude (log)
 import Universum hiding (All, Any, Vector, map, natVal, toList, transpose)
 
 import Data.Array.Repa.Algorithms.Matrix
+import Data.Vector.Unboxed.Base (Unbox)
 import Data.Vinyl.TypeLevel (AllConstrained)
+
+import Foreign.Storable (Storable)
 
 import Numeric.LinearAlgebra.Repa hiding (Matrix, Vector)
 import System.Random
@@ -78,37 +83,40 @@ inferPPCAInputMatrices
   | otherwise = unsafeCoerce (E @((y1 ~ y1), (y1 ~ y1)))
 
 mulM
-  :: forall y1 x1 y2 x2.
+  :: forall y1 x1 y2 x2 a.
   ( AllConstrained KnownNat [x1, x2, y1, y2]
+  , Numeric a
   , x1 ~ y2
   )
-  => DimMatrix D y1 x1 Double
-  -> DimMatrix D y2 x2 Double
-  -> DimMatrix D y1 x2 Double
+  => DimMatrix D y1 x1 a
+  -> DimMatrix D y2 x2 a
+  -> DimMatrix D y1 x2 a
 mulM (DimMatrix m1) (DimMatrix m2) = DimMatrix $ delay $ m1 `mulS` m2
 
 transposeM
   :: (KnownNat y, KnownNat x)
-  => DimMatrix D y x Double
-  -> DimMatrix D x y Double
+  => DimMatrix D y x a
+  -> DimMatrix D x y a
 transposeM (DimMatrix m) = DimMatrix $ transpose m
 
-mapMM :: (KnownNat y, KnownNat x)
-  => (Double -> Double)
-  -> DimMatrix D y x Double
-  -> DimMatrix D y x Double
+mapMM
+  :: (KnownNat y, KnownNat x, Unbox a, Unbox b)
+  => (a -> b)
+  -> DimMatrix D y x a
+  -> DimMatrix D y x b
 mapMM f (DimMatrix m) =  DimMatrix $ map f m
 
-mapDiagonalM :: (KnownNat y, KnownNat x)
-  => (Double -> Double)
-  -> DimMatrix D y x Double
-  -> DimMatrix D y x Double
+mapDiagonalM
+  :: (KnownNat y, KnownNat x, Unbox a)
+  => (a -> a)
+  -> DimMatrix D y x a
+  -> DimMatrix D y x a
 mapDiagonalM f (DimMatrix m) = DimMatrix $ mapDiagonal f m
 
 invSM
-  :: (KnownNat y, KnownNat x, y ~ x)
-  => DimMatrix D y x Double
-  -> DimMatrix D y x Double
+  :: (KnownNat y, KnownNat x, y ~ x, Field a, Numeric a)
+  => DimMatrix D y x a
+  -> DimMatrix D y x a
 invSM (DimMatrix m) = DimMatrix $ delay $ invS m
 
 substractMeanM
@@ -117,46 +125,49 @@ substractMeanM
   -> DimMatrix D y x Double
 substractMeanM (DimMatrix m) = DimMatrix $ substractMean m
 
-(+^^) :: forall y1 x1 y2 x2.
+(+^^) :: forall y1 x1 y2 x2 a.
   ( AllConstrained KnownNat [x1, x2, y1, y2]
   , x1 ~ x2
   , y1 ~ y2
+  , Num a
   )
-  => DimMatrix D y1 x1 Double
-  -> DimMatrix D y2 x2 Double
-  -> DimMatrix D y2 x2 Double
+  => DimMatrix D y1 x1 a
+  -> DimMatrix D y2 x2 a
+  -> DimMatrix D y2 x2 a
 (+^^) (DimMatrix m1) (DimMatrix m2) = DimMatrix $ m1 +^ m2
 
-(-^^) :: forall y1 x1 y2 x2.
+(-^^) :: forall y1 x1 y2 x2 a.
   ( AllConstrained KnownNat [x1, x2, y1, y2]
   , x1 ~ x2
   , y1 ~ y2
+  , Num a
   )
-  => DimMatrix D y1 x1 Double
-  -> DimMatrix D y2 x2 Double
-  -> DimMatrix D y2 x2 Double
+  => DimMatrix D y1 x1 a
+  -> DimMatrix D y2 x2 a
+  -> DimMatrix D y2 x2 a
 (-^^) (DimMatrix m1) (DimMatrix m2) = DimMatrix $ m1 -^ m2
 
-(*^^) :: forall y1 x1 y2 x2.
+(*^^) :: forall y1 x1 y2 x2 a.
   ( AllConstrained KnownNat [x1, x2, y1, y2]
   , x1 ~ x2
   , y1 ~ y2
+  , Num a
   )
-  => DimMatrix D y1 x1 Double
-  -> DimMatrix D y2 x2 Double
-  -> DimMatrix D y2 x2 Double
+  => DimMatrix D y1 x1 a
+  -> DimMatrix D y2 x2 a
+  -> DimMatrix D y2 x2 a
 (*^^) (DimMatrix m1) (DimMatrix m2) = DimMatrix $ m1 *^ m2
 
 cholM
-  :: (KnownNat y, KnownNat x, y ~ x)
-  => DimMatrix D y x Double
-  -> DimMatrix D y x Double
+  :: (KnownNat y, KnownNat x, Field a, y ~ x)
+  => DimMatrix D y x a
+  -> DimMatrix D y x a
 cholM (DimMatrix m) = DimMatrix $ delay $ chol $ trustSym $ computeS m
 
 sumAllSM
-  :: (KnownNat y, KnownNat x)
-  => DimMatrix D y x Double
-  -> Double
+  :: (KnownNat y, KnownNat x, Num a)
+  => DimMatrix D y x a
+  -> a
 sumAllSM (DimMatrix m) = sumAllS m
 
 foldAllSM :: (KnownNat y, KnownNat x)
