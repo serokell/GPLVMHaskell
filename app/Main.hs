@@ -13,18 +13,20 @@ import Universum
 
 main :: (HasCallStack) => IO ()
 main = do
-    [file, num] <- getArgs
-    let num' = read num
+    [file, num'] <- getArgs
+    let num = read num
     txt <- readFile file
     let (Right tParsedData) = A.parseOnly parseTestData txt
         parsedTestData = concat tParsedData
     gen <- getStdGen
     let matr = R.delay $ R.fromListUnboxed (R.Z R.:. 4 R.:. 150) parsedTestData
-        ppca = makePPCATypeSafe matr 4 (Left num') emStepsFast gen
-        w = _W ppca
-        lkh = _finalExpLikelihood ppca
+        ppca = U.makePPCA matr True 3 (Left num') gen
+        w = U._W ppca
+        lkh = U._finalExpLikelihood ppca
+        (Just restored) = U._restoredMatrix ppca
     putStrLn @String $ show (R.computeS w :: R.Array R.U R.DIM2 Double)
     putStrLn @String $ show lkh
+    putStrLn @String $ show @String (R.computeS restored :: R.Array R.U R.DIM2 Double)
 
 
 parseTestData :: Parser [[Double]]

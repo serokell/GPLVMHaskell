@@ -3,7 +3,7 @@ module Math.TestDimensions where
 import Data.Array.Repa hiding ((++))
 import GHC.TypeLits hiding (someNatVal)
 import GPLVM.Types
-import GPLVM.Util
+import GPLVM.Util hiding (trace2S)
 import Numeric.Dimensions
 
 import Prelude (log)
@@ -236,6 +236,90 @@ emStepsFast learnMatrix initMatrix initVariance stopParam =
               Right stopDiffBetweenIterations -> if (max diffVariance maxDiffNewOldW) > stopDiffBetweenIterations then stepOne newW newVariance (iteration + 1) else (newW,newVariance, expLogLikelihood)
 
    in stepOne initMatrix initVariance 0
+{-
+emStepsMissed
+  :: (HasCallStack) => Matrix D Double
+  -> Matrix D Double
+  -> Double
+  -> Either Int Double
+  -> (Matrix D Double, Double, Double)
+emStepsMissed learnMatrix@(ADelayed (Z :. d1 :. n) _) initMatrix@(ADelayed (Z :. d3 :. d2) _) initVariance stopParam =
+  let initMu = extend (Any :. (1 :: Int)) $ meanColumnWithNan learnMatrix
+
+      stepOne :: (HasCallStack) => Array D DIM2 Double -> Double -> Int -> Array D DIM2 Double -> (Matrix D Double, Double, Double)
+      stepOne (!oldP) oldVariance iteration oldMu =
+        let expT :: HasCallStack => Int -> Matrix D Double
+            expT i = trace ((show @String i) ++ "kuku : " ++ (show @String (computeS $ delay $ invW i :: Array U DIM2 Double) ) ) $
+              delay $ (delay $ invW i) `mulS` (sumPjXsubMu i)
+            x i = extend (Any :. (1 :: Int)) $ slice learnMatrix (Any :. i)
+            xList i = toList (x i)
+            knownIndices i =
+              let zipped = zip [0..] (xList i)
+              in U.map fst $ filter (not . isNaN . snd) zipped
+            oldPJ1 j =  extend (Any :. (1 :: Int)) $ slice oldP (Any :. j :. All)
+            oldPJ j = trace ((show @String j) ++ "kiki : " ++ (show @String (computeS $ delay $ oldPJ1 j :: Array U DIM2 Double) ) ) $ oldPJ1 j
+            -- oldPP i = getRows (knownIndices i) oldP --oldMu ! (Z :. j :. 0)
+            xiP i = getRows (knownIndices i) (x i) -- !  (Z :. j :. 0)
+            oldPP :: HasCallStack => Int -> Matrix D Double
+            oldPP i = getRows (knownIndices i) oldP
+            normOldPP i = sumAllS $ map (^2) $ oldPP i
+            oldPPJ :: HasCallStack => Int -> Int -> Matrix D Double
+            oldPPJ i j = extend (Any :. (1 :: Int)) $ (slice (oldPP i) (Any :. j) :: Vector D Double)
+--            oldPPJ i j = trace ((show @String 89) ++ " : " ++ (show @String (computeS $ delay $ (oldPPJ1 i j) :: Array U DIM2 Double) ) ) $ oldPPJ1 i j
+            w :: HasCallStack => Int -> Matrix D Double
+            w i = map (+ (normOldPP i)) $ fromFunction (Z:. d3 :. d3) (\(Z :. y :. x) -> if y /= x then 0.0 else oldVariance) --mapDiagonal (+ oldVariance) $ (oldPP i) `mulS` (transpose $ oldPP i)
+            invW i = trace ("2" :: String) $ invS $ w i
+            sumPjXsubMu :: (HasCallStack) => Int -> Matrix D Double
+            sumPjXsubMu i = sumListMatrices $ U.map (\j ->
+              trace (("oldPPJ" :: String) ++ " : " ++ (show @String (computeS $ delay $ (oldPPJ i j) :: Array U DIM2 Double) ) ) $
+                map (*((learnMatrix ! (Z:.j:.i)) - (oldMu ! (Z:.j:.0)))) (oldPJ j)) (knownIndices i) -- sumListMatrices $ U.map (\j -> map (* ((xij i j) - (oldMu j))) (oldP j)) knownIndices
+
+            expX = fromFunction (Z :. d1 :. n)
+                    (\(Z :. j :. i) -> if isNaN $ learnMatrix ! (Z :. j :. i) then (((oldPJ j) `mulS` (delay $ expT i)) ! (Z :. 0 :. 0)) + (oldMu ! (Z :. j :. 0)) else learnMatrix ! (Z :. j :. i))
+            expXi i = extend (Any :. (1 :: Int)) $ slice expX (Any :. i)
+            expXij i j = (expXi i) ! (Z :. j :. 0) -- if isNaN $ learnMatrix ! (Z :. j :. i) then (((oldPJ j) `mulS` (delay $ expT i)) ! (Z :. 0 :. 0)) + (oldMu ! (Z :. j :. 0)) else learnMatrix ! (Z :. j :. i)
+
+            tiTrTi i =  map (* oldVariance) (invW i) +^ ((delay $ expT i) `mulS` (transpose $ expT i))
+
+            expXiTrXi i = fromFunction (Z :. d3 :. d3)
+              (\(Z :. k :. j) ->
+                if | (isNaN $ learnMatrix ! (Z :. j :. i)) && (isNaN $ learnMatrix ! (Z :. k :. i)) && j /= k ->
+                       (((delay $ (oldPJ j) `mulS` (expT i)) `mulS` (transpose $ oldPJ k)) ! (Z :. 0 :. 0))*oldVariance + (expXij i j)*(expXij i k)
+                   | (isNaN $ learnMatrix ! (Z :. j :. i)) && (isNaN $ learnMatrix ! (Z :. k :. i)) && j == k ->
+                        (((delay $ (oldPJ j) `mulS` (expT i)) `mulS` (transpose $ oldPJ k)) ! (Z :. 0 :. 0) + 1.0)*oldVariance + (expXij i j)*(expXij i k)
+                   | (isNaN $ learnMatrix ! (Z :. j :. i)) && (not $ isNaN $ learnMatrix ! (Z :. k :. i)) ->
+                        (expXij i j)*(learnMatrix ! (Z :. k :. i))
+                   | (not $ isNaN $ learnMatrix ! (Z :. j :. i)) && (isNaN $ learnMatrix ! (Z :. k :. i)) ->
+                        (learnMatrix ! (Z :. j :. i))*(expXij i k)
+                   | (not $ isNaN $ learnMatrix ! (Z :. j :. i)) && (not $ isNaN $ learnMatrix ! (Z :. k :. i)) ->
+                        (learnMatrix ! (Z :. j :. i))*(learnMatrix ! (Z :. k :. i)) )
+            expXiTrTi i = fromFunction (Z :. d3 :. n)
+              (\(Z :. k :. j) ->
+                if   (isNaN $ learnMatrix ! (Z :. k :. j))
+                then (((oldPJ k) `mulS` (delay $ invW i)) ! (Z :. k :. j))*(oldVariance) + ((expXi i) `mulS` (transpose $ expT i) ! (Z :. 0 :. 0))
+                else ((x i) `mulS` (transpose $ expT i)) ! (Z :. 0 :. 0))
+
+        in stepTwo ([x, expT, oldPJ, expXi, tiTrTi, expXiTrXi, expXiTrTi], knownIndices, oldP) iteration oldVariance
+
+      stepTwo :: (HasCallStack) => ([Int -> Matrix D Double], Int -> [Int], Matrix D Double) -> Int -> Double -> (Matrix D Double, Double, Double)
+      stepTwo ([x, expT, oldPJ, expXi, tiTrTi, expXiTrXi, expXiTrTi], knownIndices, oldP) iteration oldVariance =
+        let newMu :: Matrix D Double
+            newMu = trace ("lalala" ++ " : " ++ (show @String (computeS $ delay $ oldP :: Array U DIM2 Double) ) ) $
+                      map (\x -> x/(fromIntegral n)) $ sumListMatrices $ U.map (\i -> (x i) -^ (oldP `mulS` (expT i))) [0..(n - 1)]
+            newP = delay $ (sumListMatrices $ U.map (\i -> (expXiTrTi i) -^ (newMu `mulS` (transpose $ expT i))) [0..(n-1)])
+                     `mulS` (delay $ invS $ sumListMatrices $ U.map (\i -> tiTrTi i) [0..(n-1)])
+            varianceStep i = map (+ ((newMu `mulS` (transpose newMu) ! (Z :. 0 :. 0)) - 2*((newMu `mulS` (expXi i)) ! (Z :. 0 :. 0)) ) ) $
+              (expXiTrXi i) -^ (map (*2) $ (expXiTrTi i) `mulS` (transpose $ newP))
+                +^ (map (*(2 * (newMu `mulS` (transpose $ expT i)) ! (Z:.0:.0))) (transpose newP)) +^ (delay (newP `mulS` (tiTrTi i)) `mulS` (transpose $ newP))
+            newVariance = (sum $ U.map (trace2S . computeS . varianceStep) [0..(n-1)])/(fromIntegral $ n*d3)
+            diffVariance = trace ("23" :: String) $ abs $ newVariance - oldVariance
+            maxDiffNewOldW = trace ("24" :: String) $ foldAllS max 0.0 $ map abs $ oldP -^ newP
+            expLogLikelihood = 1.0
+        in case stopParam of
+              Left maxIteration -> if maxIteration > iteration then stepOne newP newVariance (iteration + 1) newMu else (newP,newVariance, expLogLikelihood)
+              Right stopDiffBetweenIterations -> if (max diffVariance maxDiffNewOldW) > stopDiffBetweenIterations then stepOne newP newVariance (iteration + 1) newMu else (newP,newVariance, expLogLikelihood)
+  in stepOne initMatrix initVariance 0 initMu
+-}
 
 convertPPCATypeSafeData
   :: (KnownNat y, KnownNat x)
