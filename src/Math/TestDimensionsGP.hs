@@ -170,10 +170,15 @@ type GPConstraint a =
 -- | Main GP function: get a posterior sample by some kernel function, input observations and training data
 
 identM
-  :: (GPConstraint a, KnownNat m, KnownNat n, m ~ n)
-  => Int
-  -> DimMatrix D m n a
-identM dim = DimMatrix $ identD dim
+  :: forall m n a.
+  ( KnownNat m
+  , KnownNat n
+  , GPConstraint a
+  , m ~ n
+  )
+  => DimMatrix D m n a
+identM =
+  let dim = fromEnum $ natVal @m @Proxy Proxy in DimMatrix $ identD dim
 
 delayMatrix
   :: (KnownNat m, KnownNat n, Source r a)
@@ -182,7 +187,7 @@ delayMatrix
 delayMatrix (DimMatrix matrix) = DimMatrix (R.delay matrix)
 
 linearSolveM
-  :: (Field a, KnownNat m, KnownNat n)
+  :: (Field a, AllConstrained KnownNat '[m, n])
   => DimMatrix D m m a
   -> DimMatrix D m n a
   -> Maybe (DimMatrix D m n a)
@@ -226,31 +231,27 @@ randomMatrixD gen (rows, cols) =
     DimMatrix . R.delay $ R.fromListUnboxed (Z :. rows :. cols) randomList
 
 gpToPosteriorSample
-  :: forall a m n o p.
+  :: forall a m p.
   ( GPConstraint a
-  , AllConstrained KnownNat [m, n, o, p]
-  , o ~ n
-  , p ~ n
-  , m ~ n
+  , AllConstrained KnownNat [m, p]
   )
   => InputObservations m a        -- ^ input observations
-  -> GaussianProcess n o a        -- ^ kernel function
+  -> (forall c d. DimVector D c a -> DimVector D d a -> DimMatrix D c d a)  -- ^ kernel function
   -> GPTrainingData p a           -- ^ training data
   -> Int                          -- ^ number of samples
   -> Maybe (PosteriorSample a)    -- ^ posterior functional prior
-gpToPosteriorSample (InputObservations observe) gP trainingData sampleNumber = do
+gpToPosteriorSample (InputObservations observe) kernel trainingData sampleNumber = do
   -- | kernel applied to input test points (so-called K_ss)
-  let covarianceMatrix = kernel observe observe
+  let covarianceMatrix = kernel @m @m observe observe
 
   -- | kernel applied to input training points (so-called K)
-  let trainingKernel = kernel inputTrain' inputTrain'
+  let trainingKernel = kernel @p @p inputTrain' inputTrain'
 
   -- | Cholesky decomposition applied to kernel of training points (:), so-called L
-  let cholK = cholM $ trainingKernel +^^
-                (mapMM (* 0.00005) . identM $ vectorLength inputTrain')
+  let cholK = cholM $ trainingKernel +^^ (mapMM (* 0.00005) $ identM @p)
 
   -- | covariance between test points and input training points (so-called K_s)
-  let testPointMean = kernel observe inputTrain'
+  let testPointMean = kernel @m @p observe inputTrain'
 
   -- | (roots of L * x = K_s)
   cholKSolve <- linearSolveM cholK testPointMean
@@ -259,23 +260,22 @@ gpToPosteriorSample (InputObservations observe) gP trainingData sampleNumber = d
   cholKSolveOut <- linearSolveM cholK (transposeM $ toDimMatrix outputTrain' len)
 
   -- | compute mean
-  let mean = (transposeM cholKSolveOut) *^^ cholKSolve
+  let mean = (transposeM cholKSolveOut) `mulM` cholKSolve
 
   -- | posterior
   let postF' = cholM $
                      covarianceMatrix +^^
-                     ((mapMM (* 1.0e-6) (identM len)) -^^
-                     (transposeM cholKSolve) *^^ cholKSolve)
+                     ((mapMM (* 1.0e-6) $ identM @m) -^^
+                     (transposeM cholKSolve) `mulM` cholKSolve)
 
   -- | posterior sample
   return $ (PosteriorSample $ mean +^^ (functionalPrior postF' sampleNumber))
     where
-       kernel = gP ^. kernelGP
        inputTrain' = trainingData ^. inputTrain
        outputTrain' = trainingData ^. outputTrain
        len = vectorLength observe
        functionalPrior matrix sampleNumber =
-         matrix *^^ randomCoeffs
+         matrix `mulM` randomCoeffs
          where
            randomCoeffs = randomMatrixD (mkStdGen (-4)) (rows, sampleNumber)
            rows = fst $ matrixDims matrix
