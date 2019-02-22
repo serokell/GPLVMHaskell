@@ -24,7 +24,7 @@ module Math.Matrix
        , toDimMatrix
        , trace2SM
        , detSM
-       , toMatrix'
+       , toMatrixM'
        , zipWithDim
        , zipWithArray
        , identM
@@ -36,6 +36,7 @@ module Math.Matrix
        , matrixColsNum
        , pinvSM
        , mulPM
+       , eigSHM
        )
        where
 
@@ -54,8 +55,7 @@ import           Numeric.LinearAlgebra.Repa hiding (Matrix, Vector)
 import           System.Random (Random, RandomGen)
 
 import GPLVM.Types
-import GPLVM.Util hiding (randomMatrixD, toMatrix, toMatrix',
-                          zipWithArray)
+import GPLVM.Util hiding (randomMatrixD, zipWithArray)
 
 newtype DimVector r (n :: Nat) a
   = DimVector { runVector :: Vector r a }
@@ -78,8 +78,8 @@ instance Functor (DimVector D n) where
   fmap f (DimVector vector) = DimVector (smap f vector)
 
 withMat
-  :: Matrix D Double
-  -> (forall x y. (KnownNat x, KnownNat y) => DimMatrix D x y Double -> k)
+  :: Matrix D a
+  -> (forall x y. (KnownNat x, KnownNat y) => DimMatrix D x y a -> k)
   -> k
 withMat m f =
   let (Z :. x :. y) = extent m
@@ -87,17 +87,6 @@ withMat m f =
   case someNatVal (fromIntegral x) of
     SomeNat (Proxy :: Proxy m) -> case someNatVal (fromIntegral y) of
       SomeNat (Proxy :: Proxy n) -> f (DimMatrix @_ @m @n m)
-
-toMatrix
-  :: Source r a
-  => Array r DIM1 a
-  -> Int
-  -> Array D DIM2 a
-toMatrix arr desiredSize =
-  fromFunction (Z :. desiredSize :. newDimension) generator
-  where
-    generator (Z :. rows :. cols) = linearIndex arr cols
-    newDimension = size $ extent $ arr
 
 mulM
   :: forall y1 x1 y2 x2 a.
@@ -251,11 +240,11 @@ toDimMatrix
 toDimMatrix (DimVector arr) desiredSize =
   DimMatrix (toMatrix arr desiredSize)
 
-toMatrix'
+toMatrixM'
   :: (Source r a, KnownNat n, KnownNat m)
   => DimVector r n a
   -> DimMatrix D n m a
-toMatrix' (DimVector arr) =
+toMatrixM' (DimVector arr) =
   DimMatrix $ fromFunction (Z :. dimension :. 1) generator
   where
     dimension = size . extent $ arr
@@ -395,3 +384,12 @@ mulPM
   -> DimMatrix D y1 x2 a
 mulPM (DimMatrix m) (DimMatrix n) =
   DimMatrix . delay . runIdentity $ m `mulP` n
+
+eigSHM
+  :: (Field a, Numeric a)
+  => Herm a
+  -> (DimVector D m Double, DimMatrix D m m a)
+eigSHM hermM =
+  (DimVector $ delay $ fst out, DimMatrix $ delay $ snd out)
+  where
+    out = eigSH hermM

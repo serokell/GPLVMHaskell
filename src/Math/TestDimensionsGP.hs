@@ -21,8 +21,6 @@ import Data.Vinyl.TypeLevel (AllConstrained)
 
 import qualified Data.Vector.Storable as V
 
-import Numeric.LinearAlgebra.Repa hiding (Matrix, Vector)
-
 import System.Random
 
 import Math.Matrix
