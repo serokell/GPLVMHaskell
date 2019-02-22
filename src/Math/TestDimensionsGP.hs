@@ -23,82 +23,15 @@ import qualified Data.Vector.Storable as V
 
 import Numeric.LinearAlgebra.Repa hiding (Matrix, Vector)
 
-import Math.TestDimensions
-
 import System.Random
 
-
-newtype DimVector r (n :: Nat) a
-  = DimVector { runVector :: Vector r a }
-  deriving Eq
+import Math.Matrix
 
 newtype InputObservations (n :: Nat) a
   = InputObservations { _unInputObs :: DimVector D n a }
   deriving Eq
 
 makeLenses ''InputObservations
-
-withVec
-  :: Vector D a
-  -> (forall n. KnownNat n => DimVector D n a -> k)
-  -> k
-withVec vec f =
-  case someNatVal (fromIntegral x) of
-    SomeNat (Proxy :: Proxy m) -> f (DimVector @D @m vec)
-  where
-    (Z :. x) = R.extent vec
-
-toMatrix
-  :: Source r a
-  => Array r DIM1 a
-  -> Int
-  -> Array D DIM2 a
-toMatrix arr desiredSize =
-  R.fromFunction (Z :. desiredSize :. newDimension) generator
-  where
-    generator (Z :. rows :. cols) = R.linearIndex arr cols
-    newDimension = R.size $ R.extent $ arr
-
-toDimMatrix
-  :: (Source r a, KnownNat m, KnownNat n)
-  => DimVector r m a
-  -> Int
-  -> DimMatrix D m n a
-toDimMatrix (DimVector arr) desiredSize =
-  DimMatrix (toMatrix arr desiredSize)
-
-toMatrix'
-  :: (Source r a, KnownNat n, KnownNat m)
-  => DimVector r n a
-  -> DimMatrix D n m a
-toMatrix' (DimVector arr) =
-  DimMatrix $ R.fromFunction (Z :. dimension :. 1) generator
-  where
-    dimension = R.size . R.extent $ arr
-    generator (Z :. rows :. cols) = R.linearIndex arr rows
-
-instance Functor (DimVector D n) where
-    fmap f (DimVector vector) = DimVector (R.smap f vector)
-
-zipWithDim
-  :: (Source r1 a, Source r2 b, KnownNat m, KnownNat n)
-  => (a -> b -> c)
-  -> DimMatrix r1 m n a
-  -> DimMatrix r2 m n b
-  -> DimMatrix D m n c
-zipWithDim f (DimMatrix mat1) (DimMatrix mat2) =
-  DimMatrix $ R.zipWith f mat1 mat2
-
-zipWithArray
-  :: (KnownNat n, KnownNat m)
-  => (a -> b -> c)
-  -> DimVector D n a
-  -> DimMatrix D n m b
-  -> DimMatrix D n m c
-zipWithArray f (DimVector array1) (DimMatrix array2) =
-  DimMatrix $ R.zipWith f (toMatrix array1 n) array2
-  where
-     (Z :. n :. _) = R.extent array2
 
 zipWithArray'
   :: (a -> b -> c)
@@ -158,77 +91,7 @@ newtype PosteriorSample a = PosteriorSample
     { unSample :: forall m n . DimMatrix D m n a  -- ^ posterior sample
     }
 
--- | Constraint kind required to getting a posterior sample by a given GP
-type GPConstraint a =
-  ( Field a
-  , Random a
-  , Unbox a
-  , Floating a
-  , Eq a
-  )
-
 -- | Main GP function: get a posterior sample by some kernel function, input observations and training data
-
-identM
-  :: forall m n a.
-  ( KnownNat m
-  , KnownNat n
-  , GPConstraint a
-  , m ~ n
-  )
-  => DimMatrix D m n a
-identM =
-  let dim = fromEnum $ natVal @m @Proxy Proxy in DimMatrix $ identD dim
-
-delayMatrix
-  :: (KnownNat m, KnownNat n, Source r a)
-  => DimMatrix r m n a
-  -> DimMatrix D m n a
-delayMatrix (DimMatrix matrix) = DimMatrix (R.delay matrix)
-
-linearSolveM
-  :: (Field a, AllConstrained KnownNat '[m, n])
-  => DimMatrix D m m a
-  -> DimMatrix D m n a
-  -> Maybe (DimMatrix D m n a)
-linearSolveM (DimMatrix mat1) (DimMatrix mat2) =
-  case linearSolveS mat1 mat2 of
-    Nothing  -> Nothing
-    Just sol -> Just . delayMatrix . DimMatrix $ sol
-
-vectorLength
-  :: forall r m a. KnownNat m
-  => DimVector r m a
-  -> Int
-vectorLength _ = fromEnum $ natVal (Proxy @m)
-
-matrixDims
-  :: forall r m n a.
-  ( KnownNat m
-  , KnownNat n
-  )
-  => DimMatrix r m n a
-  -> (Int, Int)
-matrixDims _ = fromEnumPair (Proxy @m, Proxy @n)
-  where
-    fromEnumPair (x, y) = (fromEnum x, fromEnum y)
-
-
-randomMatrixD
-    :: forall a g m n.
-    ( RandomGen g
-    , Random a
-    , Unbox a
-    , Floating a
-    , KnownNat m
-    , KnownNat n
-    )
-    => g
-    -> (Int, Int)
-    -> DimMatrix D m n a
-randomMatrixD gen (rows, cols) =
-    let randomList = take (rows * cols) (normals gen) in
-    DimMatrix . R.delay $ R.fromListUnboxed (Z :. rows :. cols) randomList
 
 gpToPosteriorSample
   :: forall a m p.

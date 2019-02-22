@@ -27,11 +27,12 @@ library
       GPLVM.IVM
       GPLVM.Types
       GPLVM.Util
+      Math.Matrix
       Math.TestDimensions
       Math.TestDimensionsGP
+      Math.TestDimensionsPCA
   other-modules:
       Paths_GPLVMHaskell
-      Math.Matrix
   hs-source-dirs:
       src
   build-depends:

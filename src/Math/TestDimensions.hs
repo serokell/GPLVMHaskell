@@ -18,15 +18,14 @@ import Data.Vinyl.TypeLevel (AllConstrained)
 
 import Foreign.Storable (Storable)
 
+import Math.Matrix hiding (randomMatrixD)
+
 import Numeric.LinearAlgebra.Repa hiding (Matrix, Vector)
 import System.Random
 import Unsafe.Coerce
 
 
 --TypeFamily MulMatr Dim
-
-newtype DimMatrix r (y :: Nat) (x :: Nat) a
-  = DimMatrix { getInternal :: Matrix r a}
 
 data PPCA = PPCA
   {  _learningData        :: Matrix D Double
@@ -36,14 +35,6 @@ data PPCA = PPCA
    , _W                   :: Matrix D Double
    , _finalExpLikelihood  :: Double
    }
-
-withMat :: Matrix D Double -> (forall x y. (KnownNat x, KnownNat y) => DimMatrix D x y Double -> k) -> k
-withMat m f =
-    let (Z :. x :. y) = extent m
-    in
-    case someNatVal (fromIntegral x) of
-      SomeNat (Proxy :: Proxy m) -> case someNatVal (fromIntegral y) of
-        SomeNat (Proxy :: Proxy n) -> f (DimMatrix @_ @m @n m)
 
 makePPCATypeSafe
   :: RandomGen gen
@@ -81,111 +72,6 @@ inferPPCAInputMatrices
   | natVal (Proxy :: Proxy x2) /= natVal (Proxy :: Proxy d) =
     error $ toText $ "dimentions x2 and d should be equal, but x2 = " ++ (show (natVal (Proxy :: Proxy x2))) ++ " and d = " ++ (show (natVal (Proxy :: Proxy d)))
   | otherwise = unsafeCoerce (E @((y1 ~ y1), (y1 ~ y1)))
-
-mulM
-  :: forall y1 x1 y2 x2 a.
-  ( AllConstrained KnownNat [x1, x2, y1, y2]
-  , Numeric a
-  , x1 ~ y2
-  )
-  => DimMatrix D y1 x1 a
-  -> DimMatrix D y2 x2 a
-  -> DimMatrix D y1 x2 a
-mulM (DimMatrix m1) (DimMatrix m2) = DimMatrix $ delay $ m1 `mulS` m2
-
-transposeM
-  :: (KnownNat y, KnownNat x)
-  => DimMatrix D y x a
-  -> DimMatrix D x y a
-transposeM (DimMatrix m) = DimMatrix $ transpose m
-
-mapMM
-  :: (KnownNat y, KnownNat x, Unbox a, Unbox b)
-  => (a -> b)
-  -> DimMatrix D y x a
-  -> DimMatrix D y x b
-mapMM f (DimMatrix m) =  DimMatrix $ map f m
-
-mapDiagonalM
-  :: (KnownNat y, KnownNat x, Unbox a)
-  => (a -> a)
-  -> DimMatrix D y x a
-  -> DimMatrix D y x a
-mapDiagonalM f (DimMatrix m) = DimMatrix $ mapDiagonal f m
-
-invSM
-  :: (KnownNat y, KnownNat x, y ~ x, Field a, Numeric a)
-  => DimMatrix D y x a
-  -> DimMatrix D y x a
-invSM (DimMatrix m) = DimMatrix $ delay $ invS m
-
-substractMeanM
-  :: (KnownNat y, KnownNat x)
-  => DimMatrix D y x Double
-  -> DimMatrix D y x Double
-substractMeanM (DimMatrix m) = DimMatrix $ substractMean m
-
-(+^^) :: forall y1 x1 y2 x2 a.
-  ( AllConstrained KnownNat [x1, x2, y1, y2]
-  , x1 ~ x2
-  , y1 ~ y2
-  , Num a
-  )
-  => DimMatrix D y1 x1 a
-  -> DimMatrix D y2 x2 a
-  -> DimMatrix D y2 x2 a
-(+^^) (DimMatrix m1) (DimMatrix m2) = DimMatrix $ m1 +^ m2
-
-(-^^) :: forall y1 x1 y2 x2 a.
-  ( AllConstrained KnownNat [x1, x2, y1, y2]
-  , x1 ~ x2
-  , y1 ~ y2
-  , Num a
-  )
-  => DimMatrix D y1 x1 a
-  -> DimMatrix D y2 x2 a
-  -> DimMatrix D y2 x2 a
-(-^^) (DimMatrix m1) (DimMatrix m2) = DimMatrix $ m1 -^ m2
-
-(*^^) :: forall y1 x1 y2 x2 a.
-  ( AllConstrained KnownNat [x1, x2, y1, y2]
-  , x1 ~ x2
-  , y1 ~ y2
-  , Num a
-  )
-  => DimMatrix D y1 x1 a
-  -> DimMatrix D y2 x2 a
-  -> DimMatrix D y2 x2 a
-(*^^) (DimMatrix m1) (DimMatrix m2) = DimMatrix $ m1 *^ m2
-
-cholM
-  :: (KnownNat y, KnownNat x, Field a, y ~ x)
-  => DimMatrix D y x a
-  -> DimMatrix D y x a
-cholM (DimMatrix m) = DimMatrix $ delay $ chol $ trustSym $ computeS m
-
-sumAllSM
-  :: (KnownNat y, KnownNat x, Num a)
-  => DimMatrix D y x a
-  -> a
-sumAllSM (DimMatrix m) = sumAllS m
-
-foldAllSM :: (KnownNat y, KnownNat x)
-  => (Double -> Double -> Double)
-  -> Double
-  -> DimMatrix D y x Double
-  -> Double
-foldAllSM f initValue (DimMatrix m) = foldAllS f initValue m
-
-detSM :: (KnownNat y, KnownNat x)
-  => DimMatrix D y x Double
-  -> Double
-detSM (DimMatrix m) = detS m
-
-trace2SM :: (KnownNat y, KnownNat x)
-  => DimMatrix D y x Double
-  -> Double
-trace2SM (DimMatrix m) = trace2S $ computeS m
 
 emStepsFast
   :: forall d y1 x1 y2 x2.
