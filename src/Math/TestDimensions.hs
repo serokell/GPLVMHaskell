@@ -28,13 +28,13 @@ import Unsafe.Coerce
 --TypeFamily MulMatr Dim
 
 data PPCA = PPCA
-  {  _learningData        :: Matrix D Double
-   , desiredDimentions   :: Int
-   , stopParameter       :: Either Int Double
-   , _variance            :: Double
-   , _W                   :: Matrix D Double
-   , _finalExpLikelihood  :: Double
-   }
+  {  _learningData       :: Matrix D Double
+  , desiredDimentions    :: Int
+  , stopParameter        :: Either Int Double
+  , _variance            :: Double
+  , _W                   :: Matrix D Double
+  , _finalExpLikelihood  :: Double
+  }
 
 makePPCATypeSafe
   :: RandomGen gen

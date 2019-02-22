@@ -29,8 +29,8 @@ library
       GPLVM.Util
       Math.Matrix
       Math.TestDimensions
-      Math.TestDimensionsGP
       Math.TestDimensionsPCA
+      Math.TestDimensionsGP
   other-modules:
       Paths_GPLVMHaskell
   hs-source-dirs:

@@ -33,6 +33,7 @@ module Math.Matrix
        , vectorLength
        , matrixDims
        , randomMatrixD
+       , matrixRowsNum
        )
        where
 
@@ -319,6 +320,12 @@ vectorLength
   => DimVector r m a
   -> Int
 vectorLength _ = fromEnum $ natVal (Proxy @m)
+
+matrixRowsNum
+  :: forall r m n a. KnownNat m
+  => DimMatrix r m n a
+  -> Int
+matrixRowsNum _ = fromEnum $ natVal (Proxy @m)
 
 matrixDims
   :: forall r m n a.

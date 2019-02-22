@@ -33,14 +33,6 @@ newtype InputObservations (n :: Nat) a
 
 makeLenses ''InputObservations
 
-zipWithArray'
-  :: (a -> b -> c)
-  -> Array D DIM2 a
-  -> Array D DIM1 b
-  -> Array D DIM2 c
-zipWithArray' f array1@(ADelayed (Z :. (n :: Int) :. _) _) array2 =
-  R.zipWith f array1 (toMatrix array2 n)
-
 {-
 infixl 6 ++^
 infixl 6 --^
@@ -114,7 +106,7 @@ gpToPosteriorSample (InputObservations observe) kernel trainingData sampleNumber
   let cholK = cholM $ trainingKernel +^^ (mapMM (* 0.00005) $ identM @p)
 
   -- | covariance between test points and input training points (so-called K_s)
-  let testPointMean = kernel @m @p observe inputTrain'
+  let testPointMean = kernel @p @m inputTrain' observe
 
   -- | (roots of L * x = K_s)
   cholKSolve <- linearSolveM cholK testPointMean
@@ -129,7 +121,7 @@ gpToPosteriorSample (InputObservations observe) kernel trainingData sampleNumber
   let postF' = cholM $
                      covarianceMatrix +^^
                      ((mapMM (* 1.0e-6) $ identM @m) -^^
-                     (transposeM cholKSolve) `mulM` cholKSolve)
+                     ((transposeM cholKSolve) `mulM` cholKSolve))
 
   -- | posterior sample
   return $ (PosteriorSample $ mean +^^ (functionalPrior postF' sampleNumber))
@@ -141,4 +133,4 @@ gpToPosteriorSample (InputObservations observe) kernel trainingData sampleNumber
          matrix `mulM` randomCoeffs
          where
            randomCoeffs = randomMatrixD (mkStdGen (-4)) (rows, sampleNumber)
-           rows = fst $ matrixDims matrix
+           rows = matrixRowsNum matrix
