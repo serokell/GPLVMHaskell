@@ -79,22 +79,23 @@ data GPTrainingData (n :: Nat) a = GPTrainingData
 makeLenses ''GaussianProcess
 makeLenses ''GPTrainingData
 
-newtype PosteriorSample a = PosteriorSample
-    { unSample :: forall m n . DimMatrix D m n a  -- ^ posterior sample
+newtype PosteriorSample (m :: Nat) (n :: Nat) a = PosteriorSample
+    { unSample :: DimMatrix D m n a  -- ^ posterior sample
     }
 
 -- | Main GP function: get a posterior sample by some kernel function, input observations and training data
 
 gpToPosteriorSample
-  :: forall a m p.
+  :: forall a m p q.
   ( GPConstraint a
-  , AllConstrained KnownNat [m, p]
+  , AllConstrained KnownNat [m, p, q]
+  , p ~ q
   )
   => InputObservations m a        -- ^ input observations
   -> (forall c d. DimVector D c a -> DimVector D d a -> DimMatrix D c d a)  -- ^ kernel function
   -> GPTrainingData p a           -- ^ training data
   -> Int                          -- ^ number of samples
-  -> Maybe (PosteriorSample a)    -- ^ posterior functional prior
+  -> Maybe (PosteriorSample m q a)    -- ^ posterior functional prior
 gpToPosteriorSample (InputObservations observe) kernel trainingData sampleNumber = do
   -- | kernel applied to input test points (so-called K_ss)
   let covarianceMatrix = kernel @m @m observe observe
@@ -103,7 +104,7 @@ gpToPosteriorSample (InputObservations observe) kernel trainingData sampleNumber
   let trainingKernel = kernel @p @p inputTrain' inputTrain'
 
   -- | Cholesky decomposition applied to kernel of training points (:), so-called L
-  let cholK = cholM $ trainingKernel +^^ (mapMM (* 0.00005) $ identM @p)
+  let cholK = cholM $ trainingKernel +^^ (mapMM (* 0.00005) (identM @p))
 
   -- | covariance between test points and input training points (so-called K_s)
   let testPointMean = kernel @p @m inputTrain' observe
@@ -115,22 +116,28 @@ gpToPosteriorSample (InputObservations observe) kernel trainingData sampleNumber
   cholKSolveOut <- linearSolveM cholK (transposeM $ toDimMatrix outputTrain' len)
 
   -- | compute mean
-  let mean = (transposeM cholKSolveOut) `mulM` cholKSolve
+  let mean = (transposeM cholKSolve) `mulM` cholKSolveOut
 
   -- | posterior
-  let postF' = cholM $
+  let postF = cholM $
                      covarianceMatrix +^^
-                     ((mapMM (* 1.0e-6) $ identM @m) -^^
-                     ((transposeM cholKSolve) `mulM` cholKSolve))
+                     mapMM (* 1.0e-6) (identM @m) -^^
+                     (transposeM cholKSolve) `mulM` cholKSolve
+
+  let postF' = functionalPrior postF sampleNumber
 
   -- | posterior sample
-  return $ (PosteriorSample $ mean +^^ (functionalPrior postF' sampleNumber))
+  return $ (PosteriorSample $ mean +^^ postF')
     where
-       inputTrain' = trainingData ^. inputTrain
-       outputTrain' = trainingData ^. outputTrain
-       len = vectorLength observe
-       functionalPrior matrix sampleNumber =
-         matrix `mulM` randomCoeffs
-         where
-           randomCoeffs = randomMatrixD (mkStdGen (-4)) (rows, sampleNumber)
-           rows = matrixRowsNum matrix
+      inputTrain' = trainingData ^. inputTrain
+      outputTrain' = trainingData ^. outputTrain
+      len = vectorLength observe
+      functionalPrior
+        :: DimMatrix D m m a
+        -> Int
+        -> DimMatrix D m p a
+      functionalPrior matrix sampleNumber =
+        matrix `mulM` randomCoeffs
+        where
+          randomCoeffs = randomMatrixD (mkStdGen 0) (rows, sampleNumber)
+          rows = matrixRowsNum matrix

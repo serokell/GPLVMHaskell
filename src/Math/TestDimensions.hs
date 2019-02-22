@@ -50,14 +50,14 @@ makePPCATypeSafe
       -> (DimMatrix D y2 x2 Double, Double, Double))
   -> gen
   -> PPCA
-makePPCATypeSafe leaningVectors desiredDimentions stopParameter func generator =
+makePPCATypeSafe leaningVectors desiredDimensions stopParameter func generator =
   let _learningData@(ADelayed (Z :. n :. _) _) = leaningVectors
-      initMatrix = randomMatrixD generator (n, desiredDimentions) :: Matrix D Double
+      initMatrix = randomMatrixD generator (n, desiredDimensions) :: Matrix D Double
       initVariance = fromIntegral $ fst . next $ generator :: Double
       (_W, _variance, _finalExpLikelihood) =
         withMat _learningData $ \(ld :: DimMatrix D y1 x1 Double) ->
         withMat initMatrix $ \(initM :: DimMatrix D y2 x2 Double) ->
-        case someNatVal $ fromIntegral desiredDimentions of
+        case someNatVal $ fromIntegral desiredDimensions of
           SomeNat (Proxy :: Proxy d) ->
              withEvidence (inferPPCAInputMatrices @d @y1 @y2 @x2) $ convertPPCATypeSafeData $ func @d ld initM initVariance stopParameter
   in PPCA{..}

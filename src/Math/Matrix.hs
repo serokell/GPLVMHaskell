@@ -31,9 +31,11 @@ module Math.Matrix
        , delayMatrix
        , linearSolveM
        , vectorLength
-       , matrixDims
        , randomMatrixD
        , matrixRowsNum
+       , matrixColsNum
+       , pinvSM
+       , mulPM
        )
        where
 
@@ -158,6 +160,9 @@ substractMeanM
   -> DimMatrix D y x Double
 substractMeanM (DimMatrix m) = DimMatrix $ substractMean m
 
+infixl 6 +^^, -^^
+infixl 7 *^^
+
 (+^^)
   :: forall y1 x1 y2 x2 a.
   ( AllConstrained KnownNat [x1, x2, y1, y2]
@@ -229,14 +234,17 @@ detSM
 detSM (DimMatrix m) = detS m
 
 trace2SM
-  :: (KnownNat y, KnownNat x)
-  => DimMatrix D y x Double
+  :: (KnownNat x, KnownNat y)
+  => DimMatrix D x y Double
   -> Double
 trace2SM (DimMatrix m) = trace2S $ computeS m
 
-
 toDimMatrix
-  :: (Source r a, KnownNat m, KnownNat n)
+  ::
+  ( Source r a
+  , KnownNat m
+  , KnownNat n
+  )
   => DimVector r m a
   -> Int
   -> DimMatrix D m n a
@@ -290,7 +298,9 @@ identM
   )
   => DimMatrix D m n a
 identM =
-  let dim = fromEnum $ natVal @m @Proxy Proxy in DimMatrix $ identD dim
+  let dim = fromEnum $
+            natVal @m @Proxy Proxy in DimMatrix $
+            identD dim
 
 delayMatrix
   ::
@@ -327,16 +337,11 @@ matrixRowsNum
   -> Int
 matrixRowsNum _ = fromEnum $ natVal (Proxy @m)
 
-matrixDims
-  :: forall r m n a.
-  ( KnownNat m
-  , KnownNat n
-  )
+matrixColsNum
+  :: forall r m n a. KnownNat n
   => DimMatrix r m n a
-  -> (Int, Int)
-matrixDims _ = fromEnumPair (Proxy @m, Proxy @n)
-  where
-    fromEnumPair (x, y) = (fromEnum x, fromEnum y)
+  -> Int
+matrixColsNum _ = fromEnum $ natVal (Proxy @n)
 
 randomMatrixD
   :: forall a g m n.
@@ -361,3 +366,32 @@ type GPConstraint a =
   , Floating a
   , Eq a
   )
+
+hermToMatrixM
+  :: Herm a
+  -> DimMatrix D m n a
+hermToMatrixM = undefined
+
+pinvSM
+  ::
+  ( KnownNat y
+  , KnownNat x
+  , Field a
+  , Numeric a
+  , y ~ x
+  )
+  => DimMatrix D y x a
+  -> DimMatrix D y x a
+pinvSM (DimMatrix m) = DimMatrix . delay $ pinvS m
+
+mulPM
+  :: forall y1 x1 y2 x2 a.
+  ( AllConstrained KnownNat [x1, x2, y1, y2]
+  , Numeric a
+  , x1 ~ y2
+  )
+  => DimMatrix D y1 x1 a
+  -> DimMatrix D y2 x2 a
+  -> DimMatrix D y1 x2 a
+mulPM (DimMatrix m) (DimMatrix n) =
+  DimMatrix . delay . runIdentity $ m `mulP` n
