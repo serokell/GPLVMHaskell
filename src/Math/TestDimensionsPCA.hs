@@ -29,7 +29,7 @@ makePCA desiredDimensions input =
       (Z :. yInp :. _) = extent input                                          -- get dimension
       (meanVec, covariance) = meanCovS input
       meanMatrix = DimMatrix $ toMatrix meanVec yInp
-      adjustInput' = DimMatrix input -^^ meanMatrix
+      adjustInput = DimMatrix input -^^ meanMatrix
       (eigenValues', eigenVec) = eigSHM covariance
       eigenValue = runVector eigenValues'
       eigenVecD@(DimMatrix (ADelayed (Z :. y :. x) f)) = transposeM eigenVec              -- transposing is almost free
@@ -38,7 +38,7 @@ makePCA desiredDimensions input =
         then eigenVecD
         else DimMatrix $ ADelayed (Z :. desiredDimensions :. x) f
       eigenVectors = getInternal $ transposeM eigenVectors'                       -- colunmns are eigenvectors
-      finalData' = eigenVectors' `mulPM` transposeM adjustInput' -- data in new eigenvectors space
+      finalData' = eigenVectors' `mulPM` transposeM adjustInput -- data in new eigenvectors space
       finalData = getInternal . transposeM $ finalData'
       restoredDataWOMean = transposeM $ pinvSM eigenVectors' `mulPM` finalData'  -- restore to the original space
       restoredData = getInternal $ restoredDataWOMean +^^ meanMatrix              -- add mean

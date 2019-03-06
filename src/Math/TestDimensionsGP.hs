@@ -8,7 +8,6 @@ import Universum hiding (Vector)
 import Control.Lens (makeLenses)
 
 import Data.Array.Repa (Array (..), D, DIM1, DIM2, Source, Z (..), (:.) (..))
-import qualified Data.Array.Repa as R
 import GHC.TypeLits hiding (someNatVal, natVal)
 import GPLVM.Types hiding (InputObservations)
 import Numeric.Dimensions
@@ -77,23 +76,18 @@ data GPTrainingData (n :: Nat) a = GPTrainingData
 makeLenses ''GaussianProcess
 makeLenses ''GPTrainingData
 
-newtype PosteriorSample (m :: Nat) (n :: Nat) a = PosteriorSample
-    { unSample :: DimMatrix D m n a  -- ^ posterior sample
-    }
-
 -- | Main GP function: get a posterior sample by some kernel function, input observations and training data
 
 gpToPosteriorSample
-  :: forall a m p q.
+  :: forall a m p.
   ( GPConstraint a
-  , AllConstrained KnownNat [m, p, q]
-  , p ~ q
+  , AllConstrained KnownNat [m, p]
   )
   => InputObservations m a        -- ^ input observations
   -> (forall c d. DimVector D c a -> DimVector D d a -> DimMatrix D c d a)  -- ^ kernel function
   -> GPTrainingData p a           -- ^ training data
   -> Int                          -- ^ number of samples
-  -> Maybe (PosteriorSample m q a)    -- ^ posterior functional prior
+  -> Maybe (Matrix D a)           -- ^ posterior functional prior
 gpToPosteriorSample (InputObservations observe) kernel trainingData sampleNumber = do
   -- | kernel applied to input test points (so-called K_ss)
   let covarianceMatrix = kernel @m @m observe observe
@@ -121,20 +115,13 @@ gpToPosteriorSample (InputObservations observe) kernel trainingData sampleNumber
                      covarianceMatrix +^^
                      mapMM (* 1.0e-6) (identM @m) -^^
                      (transposeM cholKSolve) `mulM` cholKSolve
-
-  let postF' = functionalPrior postF sampleNumber
-
   -- | posterior sample
-  return $ (PosteriorSample $ mean +^^ postF')
+  return $ (getInternal $ mean +^^ functionalPrior postF)
     where
       inputTrain' = trainingData ^. inputTrain
       outputTrain' = trainingData ^. outputTrain
       len = vectorLength observe
-      functionalPrior
-        :: DimMatrix D m m a
-        -> Int
-        -> DimMatrix D m p a
-      functionalPrior matrix sampleNumber =
+      functionalPrior matrix =
         matrix `mulM` randomCoeffs
         where
           randomCoeffs = randomMatrixD (mkStdGen 0) (rows, sampleNumber)

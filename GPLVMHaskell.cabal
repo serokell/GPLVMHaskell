@@ -27,6 +27,7 @@ library
       GPLVM.IVM
       GPLVM.Types
       GPLVM.Util
+      Math.Fin
       Math.Matrix
       Math.TestDimensions
       Math.TestDimensionsPCA

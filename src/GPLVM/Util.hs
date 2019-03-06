@@ -26,6 +26,7 @@ module GPLVM.Util
        , (^--)
        , (^//)
        , (^--)
+       , argmax
        ) where
 
 import Prelude (RealFloat, head, isNaN)
@@ -231,3 +232,13 @@ infixl 7 ^//
 (^**) = zipWithArray' (*)
 (^--) = zipWithArray' (-)
 (^//) = zipWithArray' (/)
+
+argmax
+  :: (Ord a, Ord b)
+  => (a -> b)
+  -> [a]
+  -> a
+argmax f args =
+  fst $
+  maximum $
+  [ (x, f x) | x <- args ]
