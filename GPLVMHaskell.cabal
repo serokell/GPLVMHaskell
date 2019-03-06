@@ -42,12 +42,17 @@ library
     , mtl
     , normaldistribution
     , random
+    , ghc-typelits-knownnat
+    , ghc-typelits-natnormalise
+    , type-natural
     , repa
     , repa-linear-algebra
     , repa-algorithms
     , statistics
+    , singletons
     , vector
     , vinyl
+    , vec
     , universum
   build-tool-depends:
       autoexporter:autoexporter
@@ -78,6 +83,7 @@ executable GPLVMHaskell-exe
   build-depends:
       GPLVMHaskell
     , base >=4.7 && <5
+    , ghc-typelits-knownnat
     , universum
     , attoparsec
     , random

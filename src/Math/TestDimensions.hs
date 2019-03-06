@@ -1,18 +1,33 @@
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
+
+{-# LANGUAGE AllowAmbiguousTypes, FlexibleContexts, FlexibleInstances,
+             MagicHash, MultiParamTypeClasses, PolyKinds,
+             UndecidableInstances #-}
+
 module Math.TestDimensions where
 
-import Data.Array.Repa hiding ((++))
+import Data.Array.Repa
+import Data.Type.Bool
+import qualified Data.Vec.Pull as V
 import GHC.TypeLits hiding (someNatVal)
 import GPLVM.Types
 import GPLVM.Util hiding (trace2S)
-import Numeric.Dimensions
+import Numeric.Dimensions hiding (Head, Length, Tail)
+import Numeric.Type.Evidence
+import Numeric.TypedList hiding (All, Length, length, map)
+import qualified Numeric.TypedList as TL hiding (Head, Length, Tail)
+import Prelude (isNaN, log)
 
-import Prelude (log)
-
-import Universum hiding (All, Any, Vector, map, natVal, toList, transpose)
+import Universum hiding (All, Any, Vector, map, natVal, toList, transpose, (++))
+import qualified Universum as U
 
 import Data.Array.Repa.Algorithms.Matrix
+import Data.Singletons.Prelude (EnumFromTo)
+import Data.Singletons.Prelude.List (Length)
 import Data.Vinyl.TypeLevel (AllConstrained)
 
+import GHC.Exts (unsafeCoerce#)
 import Numeric.LinearAlgebra.Repa hiding (Matrix, Vector)
 import System.Random
 import Unsafe.Coerce
@@ -25,12 +40,15 @@ newtype DimMatrix r (y :: Nat) (x :: Nat) a
 
 data PPCA = PPCA
   {  _learningData        :: Matrix D Double
-   , desiredDimentions   :: Int
-   , stopParameter       :: Either Int Double
+   , desiredDimentions    :: Int
+   , stopParameter        :: Either Int Double
    , _variance            :: Double
    , _W                   :: Matrix D Double
    , _finalExpLikelihood  :: Double
    }
+
+type EvidenceList (c :: k -> Constraint) (xs :: [k])
+  = TypedList (Evidence' c) xs
 
 withMat :: Matrix D Double -> (forall x y. (KnownNat x, KnownNat y) => DimMatrix D x y Double -> k) -> k
 withMat m f =
@@ -63,19 +81,21 @@ makePPCATypeSafe leaningVectors desiredDimentions stopParameter func generator =
         withMat initMatrix $ \(initM :: DimMatrix D y2 x2 Double) ->
         case someNatVal $ fromIntegral desiredDimentions of
           SomeNat (Proxy :: Proxy d) ->
-             withEvidence (inferPPCAInputMatrices @d @y1 @y2 @x2) $ convertPPCATypeSafeData $ func @d ld initM initVariance stopParameter
+             withEvidence (inferPPCAInputMatrices @d @y1 @y2 @x2 @x1) $ convertPPCATypeSafeData $ func @d ld initM initVariance stopParameter
   in PPCA{..}
 
 inferPPCAInputMatrices
-  :: forall d y1 y2 x2.
-  AllConstrained KnownNat [d, y1, y2, x2]
-  => Evidence (x2 ~ d, y1 ~ y2)
+  :: forall d y1 y2 x2 x1.
+  AllConstrained KnownNat [d, y1, y2, x2, x1]
+  => Evidence (x2 ~ d, y1 ~ y2, 1 <= x1)
 inferPPCAInputMatrices
   | natVal (Proxy :: Proxy y1) /= natVal (Proxy :: Proxy y2) =
-    error $ toText $ "dimentions y1 and y2 should be equal, but y1 = " ++ (show (natVal (Proxy :: Proxy y1))) ++ " and y2 = " ++ (show (natVal (Proxy :: Proxy y2)))
+    error $ toText $ "dimentions y1 and y2 should be equal, but y1 = " U.++ (show (natVal (Proxy :: Proxy y1))) U.++ " and y2 = " U.++ (show (natVal (Proxy :: Proxy y2)))
   | natVal (Proxy :: Proxy x2) /= natVal (Proxy :: Proxy d) =
-    error $ toText $ "dimentions x2 and d should be equal, but x2 = " ++ (show (natVal (Proxy :: Proxy x2))) ++ " and d = " ++ (show (natVal (Proxy :: Proxy d)))
-  | otherwise = unsafeCoerce (E @((y1 ~ y1), (y1 ~ y1)))
+    error $ toText $ "dimentions x2 and d should be equal, but x2 = " U.++ (show (natVal (Proxy :: Proxy x2))) U.++ " and d = " U.++ (show (natVal (Proxy :: Proxy d)))
+  | natVal (Proxy :: Proxy x1) < 1 =
+    error $ toText ("Input matrix should have at least one column" :: String)
+  | otherwise = unsafeCoerce# (E @((y1 ~ y1), (y1 ~ y1), (x1 <= x1)))
 
 mulM
   :: forall y1 x1 y2 x2.
@@ -86,6 +106,14 @@ mulM
   -> DimMatrix D y2 x2 Double
   -> DimMatrix D y1 x2 Double
 mulM (DimMatrix m1) (DimMatrix m2) = DimMatrix $ delay $ m1 `mulS` m2
+
+emptyM
+  :: forall y x. (KnownNat x, KnownNat y, (0 <=? x || 0 <=? y) ~ 'True)
+  => DimMatrix D y x Double
+emptyM =
+  let x = fromIntegral $ natVal (Proxy :: Proxy x)
+      y = fromIntegral $ natVal (Proxy :: Proxy y)
+  in DimMatrix (delay $ fromListUnboxed (Z :. y :. x) []) :: DimMatrix D y x Double
 
 transposeM
   :: (KnownNat y, KnownNat x)
@@ -126,6 +154,15 @@ substractMeanM (DimMatrix m) = DimMatrix $ substractMean m
   -> DimMatrix D y2 x2 Double
   -> DimMatrix D y2 x2 Double
 (+^^) (DimMatrix m1) (DimMatrix m2) = DimMatrix $ m1 +^ m2
+
+(^++^) :: forall y1 x1 y2 x2.
+  ( AllConstrained KnownNat [x1, x2, y1, y2]
+  , y1 ~ y2
+  )
+  => DimMatrix D y1 x1 Double
+  -> DimMatrix D y2 x2 Double
+  -> DimMatrix D y2 (x1 + x2) Double
+(^++^) (DimMatrix m1) (DimMatrix m2) = DimMatrix $ m1 ++ m2
 
 (-^^) :: forall y1 x1 y2 x2.
   ( AllConstrained KnownNat [x1, x2, y1, y2]
@@ -175,6 +212,91 @@ trace2SM :: (KnownNat y, KnownNat x)
   => DimMatrix D y x Double
   -> Double
 trace2SM (DimMatrix m) = trace2S $ computeS m
+
+type family LessMax (x :: Nat) (yys :: [Nat]) :: Constraint where
+  LessMax x '[]     = ()
+  LessMax x (y ': ys) = ((y <= x), LessMax x ys)
+
+withListOfIndexes
+  :: forall y r . KnownNat y =>
+  [Int] -> (forall (lng :: Nat). (lng <= y) => [Int] -> r) -> r
+withListOfIndexes indexes f =
+  let lng = fromIntegral $ length indexes
+  in if (fromIntegral $ (natVal (Proxy :: Proxy y))) < maximum indexes
+     then error "index is out of range"
+     else case someNatVal (fromIntegral lng) of
+      (SomeNat (Proxy :: Proxy tlng)) ->
+        let ev = if (natVal (Proxy :: Proxy y)) <= lng
+                 then error "list of indexes is too long"
+                 else unsafeCoerce# (E :: Evidence (y ~ y)) :: Evidence (tlng <= y)
+        in withEvidence ev $ f @tlng indexes
+
+--data EitherTest a b = LeftT a | RightT b
+
+type family AllLess (iis :: [Nat]) (max :: Nat) :: Constraint where
+  AllLess '[] max = ()
+  AllLess (i ': is) max = (i <= max, AllLess is max)
+
+class MapExp (is :: [Nat]) (x1 :: Nat) (x2 :: Nat) where
+  mapExp
+    :: Proxy is
+    -> ((LessThen x1) -> DimMatrix D x2 1 Double)
+    -> DimMatrix D x2 (Length is) Double
+
+instance (KnownNat x1,
+          KnownNat x2,
+          KnownNat i,
+          KnownNat (Length is),
+          AllLess iis x1,
+          iis ~ (i ': is)) => MapExp (i ': is) x1 x2 where
+  mapExp (_ :: Proxy iis) f = f (Less $ Proxy @i) ^++^ mapExp (Proxy @is) f
+
+instance (KnownNat x1, KnownNat x2) => MapExp '[] x1 x2 where
+  mapExp _ _ = emptyM :: DimMatrix D x2 0 Double
+
+getColumn
+  :: forall n x y. (AllConstrained KnownNat[n, y, x], n <= x)
+  => DimMatrix D y x Double
+  -> DimMatrix D y 1 Double
+getColumn (DimMatrix m) =
+  let i = fromIntegral $ natVal (Proxy :: Proxy n) :: Int
+  in DimMatrix $ extend (Any :. (1 :: Int)) $ slice m (Any :. i)
+
+
+mapColumn
+  :: forall n x y0 y1 x1. (AllConstrained KnownNat[n, y0, y1, x], n <= x)
+  => DimMatrix D y0 x Double
+  -> (DimMatrix D y0 1 Double -> DimMatrix D y1 x1 Double)
+  -> DimMatrix D y1 x1 Double
+mapColumn dm f = f $ getColumn @n dm
+
+withDeletedRows
+  :: forall toDel x1 y1. (AllConstrained KnownNat [x1,y1,toDel], toDel <= y1)
+  => DimMatrix D y1 x1 Double
+  -> [Int]
+  -> DimMatrix D (y1 - toDel) x1 Double
+withDeletedRows (DimMatrix m) indexes = DimMatrix $
+  deleteRows indexes m
+
+toListM
+  :: DimMatrix D x1 y1 Double
+  -> [Double]
+toListM (DimMatrix m) = toList m
+
+type family LessPairs (is :: [Nat]) (n :: Nat) :: Constraint where
+  LessPairs '[] n = ()
+  LessPairs (i ': is) n = ((i <= n), (LessPairs is n))
+
+{- withDelNumber
+  :: forall (i :: Nat) (maxX :: Nat) (maxY :: Nat) r. (KnownNat i, i <= maxX)
+  => (forall toDelT i0. (KnownNat toDelT, toDelT <= maxY, KnownNat i0, i0 <= maxX) => r)
+  -> r
+withDelNumber f = case someNatVal (fromIntegral $ toDel @i) of
+  (SomeNat (Proxy :: Proxy toDelT)) ->
+    let ev = if natVal (Proxy :: Proxy toDelT) > natVal (Proxy :: Proxy maxY)
+             then error "list of indexes is too long"
+             else unsafeCoerce# (E :: Evidence (i ~ i)) :: Evidence (toDelT <= maxY)
+        in withEvidence ev $ f @toDelT @i -}
 
 emStepsFast
   :: forall d y1 x1 y2 x2.
@@ -236,91 +358,172 @@ emStepsFast learnMatrix initMatrix initVariance stopParam =
               Right stopDiffBetweenIterations -> if (max diffVariance maxDiffNewOldW) > stopDiffBetweenIterations then stepOne newW newVariance (iteration + 1) else (newW,newVariance, expLogLikelihood)
 
    in stepOne initMatrix initVariance 0
-{-
+
+data LessThen (max :: Nat) = forall i. (KnownNat i, i <= max) => Less (Proxy i)
+
+makeLessThenNat :: forall (max :: Nat). (KnownNat max) => Int -> LessThen max
+makeLessThenNat i | i < 0                             = error "Natural number cannot be negative."
+makeLessThenNat i | (natVal (Proxy :: Proxy max)) < (fromIntegral i) = error "Number can't be more then max type variable"
+makeLessThenNat i | otherwise =
+  case someNatVal (fromIntegral i) of
+    (SomeNat (Proxy :: Proxy iT)) ->
+      let ev = unsafeCoerce# (E :: Evidence (max <= max)) :: Evidence (iT <= max)
+      in withEvidence ev $ Less (Proxy @iT)
+
+mapAll :: [a -> r] -> [a] -> [r]
+mapAll _ [] = []
+mapAll [] _ = []
+mapAll (f:fs) (x:xs) = f x : mapAll fs xs
+
+--type family InferConstraint (complexConstraint :: Constraint) where
+--  InferConstraint (iis ~ (i ': is)) = (Length iis) ~
+
+
 emStepsMissed
-  :: (HasCallStack) => Matrix D Double
-  -> Matrix D Double
+  :: forall d y1 x1 y2 x2.
+  ( HasCallStack
+  , AllConstrained KnownNat [x1, x2, y1, y2]
+  , x2 ~ d
+  , y1 ~ y2
+  , 1 <= x1
+  )
+  => DimMatrix D y1 x1 Double
+  -> DimMatrix D y2 x2 Double
   -> Double
   -> Either Int Double
-  -> (Matrix D Double, Double, Double)
-emStepsMissed learnMatrix@(ADelayed (Z :. d1 :. n) _) initMatrix@(ADelayed (Z :. d3 :. d2) _) initVariance stopParam =
-  let initMu = extend (Any :. (1 :: Int)) $ meanColumnWithNan learnMatrix
+  -> (DimMatrix D y2 x2 Double, Double, Double, Maybe (DimMatrix D y1 x1 Double))
+emStepsMissed learnMatrix initMatrix initVariance stopParam =
+  let initMu = DimMatrix $ delay $ fromListUnboxed (Z:.d:.1) $ replicate d 0.0 :: DimMatrix D y1 1 Double
+      n  = natVal (Proxy :: Proxy x1)
+      d3 = natVal (Proxy :: Proxy y2)
+      d  = fromIntegral $ natVal (Proxy :: Proxy y1)
 
-      stepOne :: (HasCallStack) => Array D DIM2 Double -> Double -> Int -> Array D DIM2 Double -> (Matrix D Double, Double, Double)
-      stepOne (!oldP) oldVariance iteration oldMu =
-        let expT :: HasCallStack => Int -> Matrix D Double
-            expT i = trace ((show @String i) ++ "kuku : " ++ (show @String (computeS $ delay $ invW i :: Array U DIM2 Double) ) ) $
-              delay $ (delay $ invW i) `mulS` (sumPjXsubMu i)
-            x i = extend (Any :. (1 :: Int)) $ slice learnMatrix (Any :. i)
-            xList i = toList (x i)
-            knownIndices i =
-              let zipped = zip [0..] (xList i)
-              in U.map fst $ filter (not . isNaN . snd) zipped
-            oldPJ1 j =  extend (Any :. (1 :: Int)) $ slice oldP (Any :. j :. All)
-            oldPJ j = trace ((show @String j) ++ "kiki : " ++ (show @String (computeS $ delay $ oldPJ1 j :: Array U DIM2 Double) ) ) $ oldPJ1 j
-            -- oldPP i = getRows (knownIndices i) oldP --oldMu ! (Z :. j :. 0)
-            xiP i = getRows (knownIndices i) (x i) -- !  (Z :. j :. 0)
-            oldPP :: HasCallStack => Int -> Matrix D Double
-            oldPP i = getRows (knownIndices i) oldP
-            normOldPP i = sumAllS $ map (^2) $ oldPP i
-            oldPPJ :: HasCallStack => Int -> Int -> Matrix D Double
-            oldPPJ i j = extend (Any :. (1 :: Int)) $ (slice (oldPP i) (Any :. j) :: Vector D Double)
---            oldPPJ i j = trace ((show @String 89) ++ " : " ++ (show @String (computeS $ delay $ (oldPPJ1 i j) :: Array U DIM2 Double) ) ) $ oldPPJ1 i j
-            w :: HasCallStack => Int -> Matrix D Double
-            w i = map (+ (normOldPP i)) $ fromFunction (Z:. d3 :. d3) (\(Z :. y :. x) -> if y /= x then 0.0 else oldVariance) --mapDiagonal (+ oldVariance) $ (oldPP i) `mulS` (transpose $ oldPP i)
-            invW i = trace ("2" :: String) $ invS $ w i
-            sumPjXsubMu :: (HasCallStack) => Int -> Matrix D Double
-            sumPjXsubMu i = sumListMatrices $ U.map (\j ->
-              trace (("oldPPJ" :: String) ++ " : " ++ (show @String (computeS $ delay $ (oldPPJ i j) :: Array U DIM2 Double) ) ) $
-                map (*((learnMatrix ! (Z:.j:.i)) - (oldMu ! (Z:.j:.0)))) (oldPJ j)) (knownIndices i) -- sumListMatrices $ U.map (\j -> map (* ((xij i j) - (oldMu j))) (oldP j)) knownIndices
+      stepOne :: (HasCallStack)
+              => DimMatrix D y1 1 Double
+              -> DimMatrix D y2 x2 Double
+              -> Double
+              -> Int
+              -> (DimMatrix D y2 x2 Double, Double, Double, Maybe (DimMatrix D y1 x1 Double))
+      stepOne oldMu (!oldW) oldVariance iteration =
+        let yi :: forall (i :: Nat). (KnownNat i, i <= x1) => DimMatrix D y1 1 Double
+            yi = getColumn @i learnMatrix
+            yList :: forall (i :: Nat). (KnownNat i, i <= x1) => [Double]
+            yList = toListM $ yi @i
+            unknownIndices :: forall (i :: Nat). (KnownNat i, i <= x1) => [Int]
+            unknownIndices =
+              let zipped = zip [0..] (yList @i)
+              in U.map fst $ filter (isNaN . snd) zipped
 
-            expX = fromFunction (Z :. d1 :. n)
-                    (\(Z :. j :. i) -> if isNaN $ learnMatrix ! (Z :. j :. i) then (((oldPJ j) `mulS` (delay $ expT i)) ! (Z :. 0 :. 0)) + (oldMu ! (Z :. j :. 0)) else learnMatrix ! (Z :. j :. i))
-            expXi i = extend (Any :. (1 :: Int)) $ slice expX (Any :. i)
-            expXij i j = (expXi i) ! (Z :. j :. 0) -- if isNaN $ learnMatrix ! (Z :. j :. i) then (((oldPJ j) `mulS` (delay $ expT i)) ! (Z :. 0 :. 0)) + (oldMu ! (Z :. j :. 0)) else learnMatrix ! (Z :. j :. i)
+            yP :: forall i toDel. (KnownNat i, KnownNat toDel, i <= x1, toDel <= y1) =>  DimMatrix D (y1 - toDel) 1 Double
+            yP = withListOfIndexes @y1 (unknownIndices @i) (withDeletedRows (yi @i))
 
-            tiTrTi i =  map (* oldVariance) (invW i) +^ ((delay $ expT i) `mulS` (transpose $ expT i))
+            muP :: forall i toDel. (KnownNat i, KnownNat toDel, i <= x1, toDel <= y1) => DimMatrix D (y1 - toDel) 1 Double
+            muP = withListOfIndexes @y1 (unknownIndices @i) (withDeletedRows oldMu)
 
-            expXiTrXi i = fromFunction (Z :. d3 :. d3)
-              (\(Z :. k :. j) ->
-                if | (isNaN $ learnMatrix ! (Z :. j :. i)) && (isNaN $ learnMatrix ! (Z :. k :. i)) && j /= k ->
-                       (((delay $ (oldPJ j) `mulS` (expT i)) `mulS` (transpose $ oldPJ k)) ! (Z :. 0 :. 0))*oldVariance + (expXij i j)*(expXij i k)
-                   | (isNaN $ learnMatrix ! (Z :. j :. i)) && (isNaN $ learnMatrix ! (Z :. k :. i)) && j == k ->
-                        (((delay $ (oldPJ j) `mulS` (expT i)) `mulS` (transpose $ oldPJ k)) ! (Z :. 0 :. 0) + 1.0)*oldVariance + (expXij i j)*(expXij i k)
-                   | (isNaN $ learnMatrix ! (Z :. j :. i)) && (not $ isNaN $ learnMatrix ! (Z :. k :. i)) ->
-                        (expXij i j)*(learnMatrix ! (Z :. k :. i))
-                   | (not $ isNaN $ learnMatrix ! (Z :. j :. i)) && (isNaN $ learnMatrix ! (Z :. k :. i)) ->
-                        (learnMatrix ! (Z :. j :. i))*(expXij i k)
-                   | (not $ isNaN $ learnMatrix ! (Z :. j :. i)) && (not $ isNaN $ learnMatrix ! (Z :. k :. i)) ->
-                        (learnMatrix ! (Z :. j :. i))*(learnMatrix ! (Z :. k :. i)) )
-            expXiTrTi i = fromFunction (Z :. d3 :. n)
-              (\(Z :. k :. j) ->
-                if   (isNaN $ learnMatrix ! (Z :. k :. j))
-                then (((oldPJ k) `mulS` (delay $ invW i)) ! (Z :. k :. j))*(oldVariance) + ((expXi i) `mulS` (transpose $ expT i) ! (Z :. 0 :. 0))
-                else ((x i) `mulS` (transpose $ expT i)) ! (Z :. 0 :. 0))
+            oldWP :: forall i toDel. (KnownNat i, KnownNat toDel, i <= x1, toDel <= y1) => DimMatrix D (y1 - toDel) x2 Double
+            oldWP = withListOfIndexes @y1 (unknownIndices @i) (withDeletedRows oldW)
 
-        in stepTwo ([x, expT, oldPJ, expXi, tiTrTi, expXiTrXi, expXiTrTi], knownIndices, oldP) iteration oldVariance
+            mP :: forall i toDel. (KnownNat i, KnownNat toDel, i <= x1, toDel <= y1) => DimMatrix D x2 x2 Double
+            mP = mapDiagonalM (+ oldVariance) $ (transposeM (oldWP @i @toDel)) `mulM` (oldWP @i @toDel)
 
-      stepTwo :: (HasCallStack) => ([Int -> Matrix D Double], Int -> [Int], Matrix D Double) -> Int -> Double -> (Matrix D Double, Double, Double)
-      stepTwo ([x, expT, oldPJ, expXi, tiTrTi, expXiTrXi, expXiTrTi], knownIndices, oldP) iteration oldVariance =
-        let newMu :: Matrix D Double
-            newMu = trace ("lalala" ++ " : " ++ (show @String (computeS $ delay $ oldP :: Array U DIM2 Double) ) ) $
-                      map (\x -> x/(fromIntegral n)) $ sumListMatrices $ U.map (\i -> (x i) -^ (oldP `mulS` (expT i))) [0..(n - 1)]
-            newP = delay $ (sumListMatrices $ U.map (\i -> (expXiTrTi i) -^ (newMu `mulS` (transpose $ expT i))) [0..(n-1)])
-                     `mulS` (delay $ invS $ sumListMatrices $ U.map (\i -> tiTrTi i) [0..(n-1)])
-            varianceStep i = map (+ ((newMu `mulS` (transpose newMu) ! (Z :. 0 :. 0)) - 2*((newMu `mulS` (expXi i)) ! (Z :. 0 :. 0)) ) ) $
-              (expXiTrXi i) -^ (map (*2) $ (expXiTrTi i) `mulS` (transpose $ newP))
-                +^ (map (*(2 * (newMu `mulS` (transpose $ expT i)) ! (Z:.0:.0))) (transpose newP)) +^ (delay (newP `mulS` (tiTrTi i)) `mulS` (transpose $ newP))
-            newVariance = (sum $ U.map (trace2S . computeS . varianceStep) [0..(n-1)])/(fromIntegral $ n*d3)
-            diffVariance = trace ("23" :: String) $ abs $ newVariance - oldVariance
-            maxDiffNewOldW = trace ("24" :: String) $ foldAllS max 0.0 $ map abs $ oldP -^ newP
-            expLogLikelihood = 1.0
-        in case stopParam of
-              Left maxIteration -> if maxIteration > iteration then stepOne newP newVariance (iteration + 1) newMu else (newP,newVariance, expLogLikelihood)
-              Right stopDiffBetweenIterations -> if (max diffVariance maxDiffNewOldW) > stopDiffBetweenIterations then stepOne newP newVariance (iteration + 1) newMu else (newP,newVariance, expLogLikelihood)
-  in stepOne initMatrix initVariance 0 initMu
+            invMP :: forall i toDel. (KnownNat toDel, KnownNat i, i <= x1, toDel <= y1, KnownNat (y2 - toDel)) => DimMatrix D x2 x2 Double
+            invMP = invSM $ mP @i @toDel
+
+            expXi :: (LessThen y2) -> (LessThen x1) -> DimMatrix D x2 1 Double
+            expXi (Less (Proxy :: Proxy toDel)) (Less (Proxy :: Proxy i)) = ((invMP @i @toDel) `mulM` (transposeM (oldWP @i @toDel))) `mulM` ((yP @i @toDel) -^^ (muP @i @toDel))
+--        in stepTwo (yP, expXi, invMP, unknownIndices, oldW) oldVariance iteration
+
+--      stepTwo :: (HasCallStack) => ([Int -> Matrix D Double], Int -> [Int], Matrix D Double) -> Double -> Int -> (Matrix D Double, Double, Double, Maybe (Matrix D Double))
+--      stepTwo (yP, expXi, invMP, unknownIndices, oldW) oldVariance iteration =
+--        let -- expX = foldl1 (\acc i -> acc U.++ i) $ U.map expXi [0..(n-1)]
+--            expX = reifyList unknownIndices
+            ev1 :: forall (max :: Nat) (iis :: [Nat]) (i :: Nat) (is :: [Nat]). (1 <= max, iis ~ (EnumFromTo 0 (max -1)), iis ~ (i ': is)) => Evidence ((Length (EnumFromTo 0 (max -1))) ~ max)
+            ev1 = unsafeCoerce# (E @(max ~ max))
+
+--            ev :: forall (is :: [Nat]). (AllLess is x1, is ~ (EnumFromTo 0 (x1-1))) => Evidence (((Length is) ~ x1),(MapExp is x1 d))
+--            ev = case (unsafeCoerce# (E @((x1 ~ x1),(x1 ~ x1),(x1 ~ x1))) :: Evidence (((Length is) ~ x1),(MapExp is x1 d), is ~ (EnumFromTo 0 (x1-1))))
+--                   of E -> E
+--            expX = withEvidence (ev1 @x1) $ mapExp (Proxy :: Proxy (EnumFromTo 0 (x1 - 1))) (withDelNumber expXi) :: DimMatrix D x2 x1 Double
+                        {-
+            mapExp
+              :: [LessThen x1]
+              -> [DimMatrix D x2 1 Double] -- (forall (toDel :: Nat) (i :: Nat). (KnownNat toDel, KnownNat i, i <= x1, toDel <= y2) => DimMatrix D y1 1 Double) -> DimMatrix D y1 (TL.Length is) Double
+            mapExp ixs = U.map (withDelNumber expXi) ixs
 -}
+            toDel :: forall (i :: Nat). (KnownNat i, i <= x1) => Int
+            toDel = length $ unknownIndices @i
 
+            withDelNumber :: forall r. (LessThen y2 -> LessThen x1 -> r) -> LessThen x1 -> r
+            withDelNumber f l@(Less (Proxy :: Proxy i)) = case someNatVal (fromIntegral $ toDel @i) of
+                   (SomeNat (Proxy :: Proxy toDelT)) ->
+                     let ev = if natVal (Proxy :: Proxy toDelT) > natVal (Proxy :: Proxy y1)
+                              then error "list of indexes is too long"
+                              else unsafeCoerce# (E :: Evidence (y2 ~ y2)) :: Evidence (toDelT <= y2)
+                         toDelT = withEvidence ev $ Less $ (Proxy :: Proxy toDelT)
+                     in f toDelT l
+
+        in undefined
+  in undefined
+            {- newMu = extend (Any :. (1 :: Int)) $ meanColumnWithNan $ (learnMatrix -^ (oldW `mulS` expX))
+
+            newW =
+              let yj j = extend (Any :. (1 :: Int) :. All) $ slice learnMatrix (Any :. (j :: Int) :. All)
+                  yJList j = toList (yj j)
+                  unknownColumns j =
+                    let zipped = zip [0..] (yJList j)
+                    in U.map fst $ filter (isNaN . snd) zipped
+                  knownColumns j = [0..(n-1)] \\ (unknownColumns j)
+                  expXPj j = deleteColumns (unknownColumns j) expX
+                  sumInvMP j = sumListMatrices $ U.map invMP (knownColumns j)
+                  gj j = ((expXPj j) `mulS` (transpose $ expXPj j)) +^ (map (*oldVariance) (sumInvMP j))
+                  yPj j = deleteColumns (unknownColumns j) (yj j)
+                  expXtrXj j = (expXPj j) `mulS` (transpose (map (\x -> x - (newMu ! (Z:.j:.0))) (yPj j)))
+                  newWj j = (gj j) `solveS` (delay $ expXtrXj j)
+              in transpose $ foldl1 (\acc j -> acc U.++ j) $ U.map (\x -> delay $ newWj x) [0..(d-1)]
+
+            newVariance =
+              let newWPi i = deleteRows (unknownIndices i) newW
+                  newMuP i = deleteRows (unknownIndices i) newMu
+                  varianceStep i = sumAllS $
+                    (map (^(2 :: Int)) (yP i -^ ((newWPi i) `mulS` (expXi i)) -^ (newMuP i)))
+                    +^ (map (*oldVariance) $ diag $ delay $ (delay $ (delay $ newWPi i) `mulS` (invMP i)) `mulS` (transpose $ newWPi i))
+                  knownVars = foldAllS (\acc x -> if isNaN x then acc else acc + 1.0) 0.0 learnMatrix
+              in (sum $ U.map varianceStep [0..(n-1)])/knownVars
+
+            expLogLikelihood =
+              let newMuP i = deleteRows (unknownIndices i) newMu
+                  newWPi i = deleteRows (unknownIndices i) newW
+                  yCenteredP i = (yP i) -^ (newMuP i)
+                  yCenteredProd i = delay $ (yCenteredP i) `mulS` (transpose $ yCenteredP i)
+                  invMY i = mapDiagonal (+newVariance) $ (newWPi i) `mulS` (transpose $ newWPi i)
+                  knownIndices i = [0..(d-1)] \\ (unknownIndices i)
+                  expLogLikelihoodStep i = (fromIntegral $ length $ knownIndices i)*(log $ 2*pi) + (log $ detS $ invMY i) +
+                    (trace2S $ computeS $ delay $ (invMY i) `solveS` (yCenteredProd i))
+              in (-1.0)*(sum $ U.map expLogLikelihoodStep [0..(n-1)])/2.0
+
+            restoredData =
+              let muX = extend (Any :. (1 :: Int)) $ meanColumn (transpose expX)
+                  finalMu = slice (newMu +^ (newW `mulS` muX)) (Any :. (0 :: Int))
+                  wtrw = (transpose newW) `mulS` newW
+                  factor1 = newW `mulS` (delay $ inv wtrw)
+                  factor2 = computeS $ mapDiagonal (+newVariance) wtrw
+                  restoredCentered =  factor1 `mul` factor2 `mul` (computeS $ expX)
+              in (delay restoredCentered) +^ (extend (Any :. (n :: Int)) finalMu)
+
+            diffVariance = abs $ newVariance - oldVariance
+            maxDiffNewOldW = foldAllS max 0.0 $ map abs $ oldW -^ newW
+
+        in case stopParam of
+              Left maxIteration ->
+                if maxIteration > iteration
+                then stepOne newMu newW newVariance (iteration + 1)
+                else (newW,newVariance, expLogLikelihood, Just restoredData)
+              Right stopDiffBetweenIterations ->
+                if (max diffVariance maxDiffNewOldW) > stopDiffBetweenIterations
+                then stepOne newMu newW newVariance (iteration + 1)
+                else (newW,newVariance, expLogLikelihood, Just restoredData)
+  in stepOne initMu initMatrix initVariance 0
+-}
 convertPPCATypeSafeData
   :: (KnownNat y, KnownNat x)
   => (DimMatrix D y x Double, Double, Double)

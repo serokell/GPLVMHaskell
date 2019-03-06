@@ -19,6 +19,7 @@ module GPLVM.Util
        , toMatrix
        , toMatrix'
        , trace2S
+       , trace2P
        , zipWithArray
        , (++^)
        , (**^)
@@ -39,6 +40,7 @@ import Universum hiding
 import Data.Array.Repa hiding ((++))
 import Data.Array.Repa.Repr.Unboxed (Unbox)
 import Data.Array.Repa.Shape (size)
+import Data.Array.Repa.Unsafe (unsafeBackpermute)
 import Data.List ((!!), (\\))
 import Data.Random.Normal (normals)
 import Debug.Trace
@@ -49,11 +51,17 @@ import GPLVM.Types
 
 trace2S :: Array U DIM2 Double -> Double
 trace2S x
- = sumAllS $ slice y (Z :. (0 :: Int) :. All)
+ = sumAllS $ unsafeBackpermute (Z :. (min nRows nColumns)) (\(Z :. i) -> (Z :. i :. i)) x
  where
-    y               =  backpermute (extent x) f x
+    (Z :. nRows :. nColumns) = extent x
+
+trace2P :: Monad m => Array U DIM2 Double -> m Double
+trace2P x
+ = sumAllP $ slice y (Z :. (0 :: Int) :. All)
+ where
+    y               =  unsafeBackpermute dim f x
     f (Z :. i :. j) = Z :. (i + j) `mod` nRows:. j
-    Z :. nRows :. _nCols = extent x
+    dim@(Z :. nRows :. _) = extent x
 
 deleteRows
   :: forall a. Unbox a
