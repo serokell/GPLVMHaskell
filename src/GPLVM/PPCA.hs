@@ -19,7 +19,7 @@ import Numeric.LinearAlgebra.Repa hiding (Matrix, Vector, diag)
 import System.Random
 
 data PPCA = PPCA
-  {  _hasMissedData       :: Bool
+  {  _noMissedData       :: Bool
    , _learningData        :: Matrix D Double
    , desiredDimension   :: Int
    , stopParameter       :: Either Int Double
@@ -32,20 +32,20 @@ data PPCA = PPCA
 makePPCA
   :: (HasCallStack) => RandomGen gen
   => Matrix D Double   -- ^ learning vectors
-  -> Bool              -- ^ Is there missed data
   -> Int               -- ^ desired dimention
   -> Either Int Double -- ^ number of iterations or
                        --   the value of stop difference of the likelihood expectation between interations of EM.
   -> gen
   -> PPCA
-makePPCA leaningVectors _hasMissedData desiredDimension stopParameter generator =
+makePPCA leaningVectors desiredDimension stopParameter generator =
   let _learningData@(ADelayed (Z :. n :. _) _) = leaningVectors
       initMatrix = randomMatrixD generator (n, desiredDimension)
       initDispersion = fromIntegral $ fst . next $ generator
+      _noMissedData = not $ isNaN $ runIdentity $ sumAllP _learningData
       (_W, _variance, _finalExpLikelihood, _restoredMatrix) =
-        if _hasMissedData
-        then emStepsMissed _learningData initMatrix initDispersion stopParameter
-        else emStepsFast _learningData initMatrix initDispersion stopParameter
+        if _noMissedData
+        then emStepsFast _learningData initMatrix initDispersion stopParameter
+        else emStepsMissed _learningData initMatrix initDispersion stopParameter
   in PPCA{..}
 
 -- TODO: add comments to the most of following local binds
@@ -155,6 +155,7 @@ emStepsMissed learnMatrix@(ADelayed (Z :. _ :. n) _) initMatrix@(ADelayed (Z :. 
                   knownIndices i = [0..(d-1)] \\ (unknownIndices i)
                   expLogLikelihoodStep i = (fromIntegral $ length $ knownIndices i)*(log $ 2*pi) + (log $ detS $ invMY i) +
                     (trace2S $ computeS $ delay $ (invMY i) `solveS` (yCenteredProd i))
+
               in (-1.0)*(sum $ U.map expLogLikelihoodStep [0..(n-1)])/2.0
 
             restoredData =

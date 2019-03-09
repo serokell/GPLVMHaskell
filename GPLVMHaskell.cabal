@@ -45,6 +45,7 @@ library
     , ghc-typelits-knownnat
     , ghc-typelits-natnormalise
     , type-natural
+    , singletons
     , repa
     , repa-linear-algebra
     , repa-algorithms
