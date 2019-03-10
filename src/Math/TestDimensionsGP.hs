@@ -6,19 +6,19 @@ import Universum hiding (Vector)
 
 import Control.Lens (makeLenses)
 
-import Data.Array.Repa (Array (..), D, DIM1, DIM2, Source, Z (..), (:.) (..))
+import Data.Array.Repa ((:.)(..), Array(..), D, DIM1, DIM2, Source, Z(..))
 import qualified Data.Array.Repa as R
 import GHC.TypeLits hiding (someNatVal)
 import GPLVM.Types
 import Numeric.Dimensions
 
-import Data.Array.Repa.Repr.Unboxed (Unbox)
 import Data.Array.Repa.Algorithms.Matrix
+import Data.Array.Repa.Repr.Unboxed (Unbox)
 import Data.Vinyl.TypeLevel (AllConstrained)
 
 import Numeric.LinearAlgebra.Repa hiding (Matrix, Vector)
 
-import Math.TestDimensions
+--import Math.TestDimensions
 
 import System.Random
 

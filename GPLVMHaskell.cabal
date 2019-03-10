@@ -27,7 +27,9 @@ library
       GPLVM.IVM
       GPLVM.Types
       GPLVM.Util
-      Math.TestDimensions
+      GPLVM.TypeSafe.PPCA
+      GPLVM.TypeSafe.Types
+      GPLVM.TypeSafe.Util
       Math.TestDimensionsGP
   other-modules:
       Paths_GPLVMHaskell
