@@ -4,7 +4,11 @@
 -- https://papers.nips.cc/paper/2240-fast-sparse-gaussian-process-methods-the-informative-vector-machine.pdf
 
 
-module GPLVM.IVM where
+module GPLVM.IVM
+       ( IVMInput (..)
+       , IVMOutput (..)
+       , runIVM
+       ) where
 
 import Universum hiding (Vector)
 
@@ -23,28 +27,29 @@ import Statistics.Distribution
 import Statistics.Distribution.Normal (standard)
 
 data IVMInput = IVMInput
-  { _inputLength      :: Int
-  , _desiredSparsity  :: Int
-  , _covarianceMatrix :: Matrix D Double
+  { _inputLength      :: Int              -- the number of input points
+  , _desiredSparsity  :: Int              -- the number of active points
+  , _covarianceMatrix :: Matrix D Double  -- covariance matrix
   , _inputMatrix      :: Matrix D Double
-  , _biasParameter    :: Double
+  , _biasParameter    :: Double           -- bias parameter (required for Gaussian noise)
   }
 
 data IVMOutput = IVMOutput
-  { firstMatrix  :: Matrix D Double
-  , secondMatrix :: Matrix D Double
-  , thirdMatrix  :: Matrix D Double
+  { _firstMatrix  :: Matrix D Double
+  , _secondMatrix :: Matrix D Double
+  , _thirdMatrix  :: Matrix D Double
+  , _activeSet    :: [Int]
   }
 
 makeLenses ''IVMInput
+makeLenses ''IVMOutput
 
 runIVM
   :: IVMInput
-  -> [Double]
+  -> IVMOutput
 runIVM ivm =
   case sparsity <= len of
-    True -> do
-      undefined
+    True -> undefined
     False -> error errorMsg
   where
     sparsity = ivm ^. desiredSparsity
@@ -53,11 +58,25 @@ runIVM ivm =
     covariance = ivm ^. covarianceMatrix
     inputList = [1..len]
 
+    emptyVec :: Vector D Double
     emptyVec = ADelayed (Z :. sparsity) (const 0)
+    
+    initialPi :: Matrix D Double
     initialPi = diagD emptyVec
     initialA = diagD . takeDiagD $ covariance
     initialH = emptyVec
     initialM = emptyVec
+
+    mMatrix
+      :: Int
+      -> Matrix D Double
+    mMatrix ind = undefined
+
+    updateCovariance
+      :: Int
+      -> Matrix D Double
+    updateCovariance ind =
+      covariance -^ mMatrix ind
 
     zet -- required for alpha
       :: Int
@@ -77,7 +96,8 @@ runIVM ivm =
       -> Double
     alpha ind vec1 vec2 mat =
       index vec1 (Z :. ind) {- * normal distr -} /
-      cumulativeNorm (index vec2 (Z :. ind)) * sqrt (index mat (Z :. ind :. ind))
+      cumulativeNorm (index vec2 (Z :. ind)) *
+      sqrt (index mat (Z :. ind :. ind))
 
     mu
       :: Int

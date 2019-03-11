@@ -11,7 +11,7 @@ extra-deps:
 - git: https://github.com/adscib/monad-bayes
   commit: 647ba7cb5a98ae028600f3d828828616891b40fb
 - git: https://github.com/Haskell-mouse/repa-linear-algebra
-  commit: 0cf2036e4423a14bbaf404e89bdd8f7c7321021d
+  commit: 6fdf916b294af891bc6423728f3f71ac2095d95d
 
 - git: https://github.com/achirkin/easytensor
   commit: 75dc180c08ceb2321a6eca526a45739da34f646c
