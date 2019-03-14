@@ -23,8 +23,8 @@ main = do
         parsedTestData = concat tParsedData
     gen <- getStdGen
     let matr = R.delay $ R.fromListUnboxed (R.Z R.:. 4 R.:. 150) parsedTestData
-        ppca = makePPCATypeSafe matr 4 (Left num)  gen -- U.makePPCA matr True 3 (Left num) gen
-        uppca = U.makePPCA matr 4 (Left num) gen
+        ppca = makePPCATypeSafe matr 3 (Left num) gen
+        uppca = U.makePPCA matr 3 (Left num) gen
         w = _W ppca
         wU = U._W uppca
         lkh = _finalExpLikelihood ppca

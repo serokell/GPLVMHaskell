@@ -19,10 +19,10 @@ import Numeric.LinearAlgebra.Repa hiding (Matrix, Vector, diag)
 import System.Random
 
 data PPCA = PPCA
-  {  _noMissedData       :: Bool
+  {  _noMissedData        :: Bool
    , _learningData        :: Matrix D Double
-   , desiredDimension   :: Int
-   , stopParameter       :: Either Int Double
+   , desiredDimension     :: Int
+   , stopParameter        :: Either Int Double
    , _variance            :: Double
    , _W                   :: Matrix D Double
    , _finalExpLikelihood  :: Double

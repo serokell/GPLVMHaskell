@@ -38,6 +38,7 @@ import Data.Type.Natural
 -- REPA
 import qualified Data.Array.Repa as R
 
+-- Creates and checks initial data for PPCA function.
 makePPCATypeSafe
   :: RandomGen gen
   => Matrix R.D Double   -- ^ learning vectors
@@ -56,9 +57,9 @@ makePPCATypeSafe leaningVectors desiredDimensions stopParameter generator =
         withMat initMatrix $ \(initM :: DimMatrix R.D y2 x2 Double) ->
           case toSing (intToNat desiredDimensions) of
             (SomeSing (sDesired :: Sing d)) -> withSingI sDesired $
-              let (ev1,ev2,ev3) = inferPPCAInputMatrices @d @y1 @y2 @x2 @x1
+              let (ev1,ev2,ev3) = checkPPCAInputMatricesProp @d @y1 @y2 @x2 @x1
               in case ev1 of
-                Disproved _ -> error $ toText @String $ "dimentions x2 and d1 should be equal, but they are not" -- y1 = " U.++ (show (natVal (Proxy :: Proxy y1))) U.++ " and y2 = " U.++ (show (natVal (Proxy :: Proxy y2)))
+                Disproved _ -> error $ toText @String $ "dimentions x2 and d1 should be equal, but they are not"
                 Proved Refl -> case ev2 of
                   Disproved _ -> error $ toText @String $ "dimentions y1 and y2 should be equal, but they are not"
                   Proved Refl -> case ev3 of
@@ -68,10 +69,10 @@ makePPCATypeSafe leaningVectors desiredDimensions stopParameter generator =
                                  else convertPPCATypeSafeData $ emStepsMissed @d ld initM initVariance stopParameter
   in PPCA{..}
 
-inferPPCAInputMatrices
+checkPPCAInputMatricesProp
   :: forall d y1 y2 x2 x1. (AllConstrained SingI '[d,y1,y2,x2,x1]) =>
      (Decision (x2 :~: d), Decision (y1 :~: y2), Decision (One :<: x1))
-inferPPCAInputMatrices =
+checkPPCAInputMatricesProp =
   let d1 = (sing :: Sing x2) %~ (sing :: Sing d)
       d2 = (sing :: Sing y1) %~ (sing :: Sing y2)
       d3 = (sing :: Sing One) %< (sing :: Sing x1)
@@ -118,14 +119,6 @@ emStepsFast learnMatrix initMatrix initVariance stopParam =
             expZtrZ = (mapMM (*((fromIntegral n)*oldVariance)) invM) +^^ (expEznZ `mulM` (transposeM $ expEznZ))
         in stepTwo (expEznZ, expZtrZ, expXnEZnZ) oldW oldVariance iteration
 
-      stepTwo
-        :: forall y12 x12 y22 x22 y32 x32 y42 x42 y52 x52 .
-           (HasCallStack, x42 ~ d, y12 ~ d, x22 ~ d, y22 ~ d, x32 ~ d, x12 ~ x1, y32 ~ y2, x52 ~ d, y2 ~ y52, y42 ~ y52)
-           => (DimMatrix R.D y12 x12 Double, DimMatrix R.D y22 x22 Double, DimMatrix R.D y32 x32 Double)
-           -> DimMatrix R.D y42 x42 Double
-           -> Double
-           -> Int
-           -> (DimMatrix R.D y52 x52 Double, Double, Double, Maybe (DimMatrix R.D y1 x1 Double))
       stepTwo (expEznZ, expZtrZ, expXnEZnZ) oldW oldVariance iteration =
         let newW = expXnEZnZ `mulM` (invSM expZtrZ)
             u = cholM expZtrZ
@@ -169,6 +162,7 @@ emStepsMissed learnMatrix initMatrix initVariance stopParam =
       n  = demote @x1
       d  = natToInt $ demote @y1
 
+      -- The first step of EM-algorithm
       stepOne :: (HasCallStack)
               => DimMatrix R.D y1 One Double
               -> DimMatrix R.D y2 x2 Double
@@ -176,73 +170,94 @@ emStepsMissed learnMatrix initMatrix initVariance stopParam =
               -> Int
               -> (DimMatrix R.D y2 x2 Double, Double, Double, Maybe (DimMatrix R.D y1 x1 Double))
       stepOne oldMu (!oldW) oldVariance iteration =
-        let yi :: forall i. (((i <= x1) ~ 'True), SingI i) => Proxy i -> DimMatrix R.D y1 One Double
+        let -- get i-th colum of input data
+            yi :: forall i. (((i <= x1) ~ 'True), SingI i) => Proxy i -> DimMatrix R.D y1 One Double
             yi _ = withSomeSing (demote @i) $ \s -> withSingI s $ getColumn @i learnMatrix
 
+            -- converted to list
             yList :: forall (i :: Nat). (((i <= x1) ~ 'True), SingI i) => [Double]
             yList = toListM $ yi (Proxy :: Proxy i)
 
-            unknownIndices :: LessThen x1 -> [Int]
-            unknownIndices (Less (Proxy :: Proxy i)) =
+            -- list of indexes of NaN numbers in the i-th column
+            unknownIndexes :: LessThen x1 -> [Int]
+            unknownIndexes (Less (Proxy :: Proxy i)) =
               let zipped = zip [0..] (yList @i)
               in U.map fst $ filter (isNaN . snd) zipped
 
+            -- i-th column with removed rows with NaN
             yP :: forall i toDel. ((i <= x1) ~ 'True, (toDel <= y1) ~ 'True, SingI i)
                => Proxy i -> Proxy toDel -> DimMatrix R.D (y1 - toDel) One Double
-            yP iP _ = withListOfIndexes @y1 (unknownIndices (Less iP)) (deleteRowsM @toDel (yi (Proxy :: Proxy i)))
+            yP iP _ = withListOfIndexes @y1 (unknownIndexes (Less iP)) (deleteRowsM @toDel (yi (Proxy :: Proxy i)))
 
+            -- Mean vector with removed rows with unknownIndexes of the i-th column
             muP :: forall i toDel. ((i <= x1) ~ 'True, (toDel <= y1) ~ 'True, SingI i) => DimMatrix R.D (y1 - toDel) One Double
-            muP = withListOfIndexes @y1 (unknownIndices (Less $ (Proxy :: Proxy i))) (deleteRowsM @toDel oldMu)
+            muP = withListOfIndexes @y1 (unknownIndexes (Less $ (Proxy :: Proxy i))) (deleteRowsM @toDel oldMu)
 
+            -- W matrix with removed rows with unknownIndexes of the i-th column
             oldWP :: forall i toDel. ((i <= x1) ~ 'True, (toDel <= y1) ~ 'True, SingI i)
                   => Proxy i -> Proxy toDel -> DimMatrix R.D (y1 - toDel) x2 Double
-            oldWP iP _ = withListOfIndexes @y1 (unknownIndices (Less iP)) (deleteRowsM @toDel oldW)
+            oldWP iP _ = withListOfIndexes @y1 (unknownIndexes (Less iP)) (deleteRowsM @toDel oldW)
 
+            -- M = variance*I + W*(transpose W)
+            -- mP is M with removed rows with unknownIndexes of the i-th column
             mP :: (LessThen x1) -> (LessThen y2) -> DimMatrix R.D x2 x2 Double
             mP (Less iP@(Proxy :: Proxy iT)) (Less toDelP@(Proxy :: Proxy toDelT)) =
               mapDiagonalM (+ oldVariance) $ (transposeM (oldWP iP toDelP)) `mulM` (oldWP iP toDelP)
 
+            -- (mP)^(-1)
             invMP :: (LessThen x1) -> (LessThen y2) -> DimMatrix R.D x2 x2 Double
             invMP i toDel = invSM $ mP i toDel
 
+            -- expectation of i-th column of X matrix (y = W*X + mu + noise)
             expXi :: (LessThen y2) -> (LessThen x1) -> DimMatrix R.D x2 One Double
             expXi toDelL@(Less toDelP@(Proxy :: Proxy toDel)) iL@(Less iP@(Proxy :: Proxy i)) = ((invMP iL toDelL) `mulM` (transposeM (oldWP iP toDelP))) `mulM` ((yP iP toDelP) -^^ (muP @i @toDel))
 
-        in stepTwo (expXi, invMP, unknownIndices, oldW) oldVariance iteration
+        in stepTwo (expXi, invMP, unknownIndexes, oldW) oldVariance iteration
 
-
-      stepTwo (expXi, invMP, unknownIndices, oldW) oldVariance iteration =
-        let yi :: forall i. (((i <= x1) ~ 'True), SingI i) => Proxy i -> DimMatrix R.D y1 One Double
+      -- The second step of EM-algorithm
+      stepTwo (expXi, invMP, unknownIndexes, oldW) oldVariance iteration =
+        let
+            -- get i-th colum of input data
+            yi :: forall i. (((i <= x1) ~ 'True), SingI i) => Proxy i -> DimMatrix R.D y1 One Double
             yi _ = withSomeSing (demote @i) $ \s -> withSingI s $ getColumn @i learnMatrix
 
+            -- i-th column with deleted NaN rows
             yP :: forall i toDel. ((i <= x1) ~ 'True, (toDel <= y1) ~ 'True, SingI i)
                => Proxy i -> Proxy toDel -> DimMatrix R.D (y1 - toDel) One Double
-            yP iP _ = withListOfIndexes @y1 (unknownIndices (Less iP)) (deleteRowsM @toDel (yi (Proxy :: Proxy i)))
+            yP iP _ = withListOfIndexes @y1 (unknownIndexes (Less iP)) (deleteRowsM @toDel (yi (Proxy :: Proxy i)))
 
             expX_ ::forall (i :: Nat). ((i <= x1) ~ 'True ) => Sing i  -> DimMatrix R.D x2 i Double
             expX_ SZ = emptyM :: DimMatrix R.D x2 Zero Double
             expX_ (SS l) = case lemma1 l (Sing :: Sing x1) of LS -> withSingI l $ (expX_ l) ^++^ ((withDelNumber expXi) (Less (Proxy :: Proxy (i - One))))
 
+            -- expextation of X (y = W*X + mu + noise)
             expX :: DimMatrix R.D x2 x1 Double
             expX = case lemmaXLEqX (Sing :: Sing x1) (Sing :: Sing x1) of LS -> expX_ (Sing :: Sing x1)
 
+            -- Number of deleted rows in i-th column
             toDel :: forall (i :: Nat). (((i <= x1) ~ 'True), SingI i) => Proxy i -> Int
-            toDel iP = length $ unknownIndices (Less iP)
+            toDel iP = length $ unknownIndexes (Less iP)
 
+            -- Lift toDel to the type-level and pass to the continuation
             withDelNumber :: forall r. (SingI y2) => (LessThen y1 -> LessThen x1 -> r) -> LessThen x1 -> r
             withDelNumber f l@(Less iP) = f (makeLessThenNat @y2 (toDel iP)) l
 
+            -- New mean values vector
             newMu :: DimMatrix R.D y2 One Double
             newMu = meanColumnWithNanM $ (learnMatrix -^^ (oldW `mulM` expX))
 
+            -- updated transform matrix
             newW :: DimMatrix R.D y2 x2 Double
             newW =
-              let yj :: forall (j :: Nat). (((j <= y1) ~ 'True), SingI j) => DimMatrix R.D One x1 Double
+              let -- j-th row of input data
+                  yj :: forall (j :: Nat). (((j <= y1) ~ 'True), SingI j) => DimMatrix R.D One x1 Double
                   yj = withSomeSing (demote @j) $ \s -> withSingI s $ getRow @j learnMatrix
 
+                  -- converted to list
                   yJList :: forall (j :: Nat). (((j <= y1) ~ 'True), SingI j) => [Double]
                   yJList = toListM $ yj @j
 
+                  -- List of colum numbers with NaN in the current row
                   unknownColumns :: LessThen y1 -> [Int]
                   unknownColumns (Less (Proxy :: Proxy j)) =
                     let zipped = zip [0..] (yJList @j)
@@ -251,58 +266,75 @@ emStepsMissed learnMatrix initMatrix initVariance stopParam =
                   knownColumns :: LessThen y1 -> [Int]
                   knownColumns j = [0..((natToInt n) - 1)] \\ (unknownColumns j)
 
+                  -- Expectation of X with columns corresponded to known columns of j-th row of input data
                   expXPj :: forall j toDel. ((j <= y1) ~ 'True, (toDel <= x1) ~ 'True, SingI j)
                          => Proxy j -> Proxy toDel -> DimMatrix R.D x2 (x1 - toDel) Double
                   expXPj jP _ = withListOfIndexes @x1 (unknownColumns (Less jP)) (deleteColumnsM @toDel expX)
 
+                  -- Number of NaNs in j-th column
                   toDelColumns :: forall (j :: Nat). (((j <= y1) ~ 'True), SingI j) => Proxy j -> Int
                   toDelColumns jP = length $ unknownColumns (Less jP)
 
+                  -- Lift toDelColumns to the type-level and pass to the continuation
                   withDelColumns :: forall r. (SingI y2) => (LessThen x1 -> LessThen y1 -> r) -> LessThen y1 -> r
                   withDelColumns f l@(Less jP) = f (makeLessThenNat @x1 (toDelColumns jP)) l
 
+                  -- Calculate InvMP matrix for every column, which has not NaN in j-th row
                   sumInvMP :: forall j. ((j <= y1) ~ 'True, SingI j)
                            => Proxy j -> DimMatrix R.D x2 x2 Double
                   sumInvMP jP = sumListMatricesM $ U.map ((withDelNumber (flip invMP)) . (makeLessThenNat @x1)) (knownColumns $ Less $ jP)
 
+                  -- g matrix from the "Probabilistic Principal Component Analysis with Expectation
+                  -- Maximization (PPCA-EM) Facilitates Volume Classification and
+                  -- Estimates the Missing Data" paper
                   gj :: forall j toDel. (((j <= y1) ~ 'True), (toDel <= x1) ~ 'True, SingI j)
                      => Proxy j -> Proxy toDel -> DimMatrix R.D x2 x2 Double
                   gj jP@(Proxy :: Proxy j) toDelP = (expXPJ `mulM` (transposeM expXPJ)) +^^ (mapMM (*oldVariance) (sumInvMP jP))
                     where expXPJ = expXPj jP toDelP
 
+                  -- J-th row with deleted NaNs
                   yPj :: forall j toDel. (((j <= y1) ~ 'True), (toDel <= x1) ~ 'True, SingI j)
                       => Proxy j -> Proxy toDel -> DimMatrix R.D One (x1 - toDel) Double
                   yPj jP _ = withListOfIndexes @x1 (unknownColumns (Less jP)) (deleteColumnsM @toDel $ yj @j)
 
+                  -- expectation of X * (transpose X)
                   expXtrXj :: forall j toDel. (((j <= y1) ~ 'True), (toDel <= x1) ~ 'True, SingI j)
                            => Proxy j -> Proxy toDel -> DimMatrix R.D x2 One Double
                   expXtrXj jP toDelP = (expXPj jP toDelP) `mulM` (transposeM $ mapMM (\x -> x - newMu ^!^ (Less jP,Less $ (Proxy :: Proxy 'Z))) (yPj jP toDelP))
 
+                  -- calculate J-th column of updated W matrix
                   newWj :: LessThen x1 -> LessThen y1 -> DimMatrix R.D x2 One Double
                   newWj  (Less toDelP) (Less jP) = (gj jP toDelP) `solveM` (expXtrXj jP toDelP)
 
+                  -- recursive function which calculates newWj and appends it to already calculated part of newW matrix
                   newW_ :: forall (j :: Nat). ((j <= y2) ~ 'True ) => Sing j  -> DimMatrix R.D x2 j Double
                   newW_ SZ = emptyM :: DimMatrix R.D x2 Zero Double
                   newW_ (SS l) = case lemma1 l (Sing :: Sing y2) of LS -> withSingI l $ (newW_ l) ^++^ ((withDelColumns newWj) (Less (Proxy :: Proxy (j - One))))
 
               in transposeM $ case lemmaXLEqX (Sing :: Sing y2) (Sing :: Sing y1) of LS -> newW_ (Sing :: Sing y2)
 
+            -- update variance
             newVariance =
-                let newWPi :: forall toDel. ((toDel <= y1) ~ 'True)
+                let -- newW with deleted rows with numbers equal to the numbers of rows with NaN in i-th column
+                    newWPi :: forall toDel. ((toDel <= y1) ~ 'True)
                           => LessThen x1 -> Proxy toDel -> DimMatrix R.D (y1 - toDel) x2 Double
-                    newWPi iL _ = withListOfIndexes @y1 (unknownIndices iL) (deleteRowsM @toDel newW)
+                    newWPi iL _ = withListOfIndexes @y1 (unknownIndexes iL) (deleteRowsM @toDel newW)
 
+                    -- the same for the new means vector
                     newMuP :: forall toDel. ((toDel <= y1) ~ 'True)
                            => LessThen x1 -> Proxy toDel -> DimMatrix R.D (y1 - toDel) One Double
-                    newMuP iL _ = withListOfIndexes @y1 (unknownIndices iL) (deleteRowsM @toDel newMu)
+                    newMuP iL _ = withListOfIndexes @y1 (unknownIndexes iL) (deleteRowsM @toDel newMu)
 
+                    -- calculate the addend of variance for i-th column
                     varianceStep :: LessThen x1 -> LessThen y1 -> Double
                     varianceStep iL@(Less iP) toDelL@(Less toDelP) = sumAllSM $
                       (mapMM (^(2 :: Int)) ((yP iP toDelP) -^^ ((newWPi iL toDelP) `mulM` (expXi toDelL iL)) -^^ (newMuP iL toDelP)))
                       +^^ (mapMM (*oldVariance) $ diagM $ ((newWPi iL toDelP) `mulM` (invMP iL toDelL)) `mulM` (transposeM $ (newWPi iL toDelP)))
 
+                    -- total number of known elements in the whole input data matrix
                     knownVars = foldAllSM (\acc x -> if isNaN x then acc else acc + 1.0) 0.0 learnMatrix
 
+                    -- recursive function which calculates varianceStep and appends it to already calculated part
                     newVariance_ :: forall (i :: Nat). ((i <= x1) ~ 'True ) => Sing i -> Double
                     newVariance_ SZ = 0.0
                     newVariance_ (SS l) =
@@ -310,16 +342,19 @@ emStepsMissed learnMatrix initMatrix initVariance stopParam =
                       of LS -> withSingI l $ (newVariance_ l) + ((withDelNumber (flip varianceStep)) (Less (Proxy :: Proxy (i - One))))
                 in (case lemmaXLEqX (Sing :: Sing x1) (Sing :: Sing x1) of LS -> newVariance_ (Sing :: Sing x1))/knownVars
 
+            -- Expectation of logarithm of likelihood
+            -- should be calculated only in the last iterarion
             expLogLikelihood :: Double
             expLogLikelihood =
               let newWPi :: forall toDel. ((toDel <= y1) ~ 'True)
                          => LessThen x1 -> Proxy toDel -> DimMatrix R.D (y1 - toDel) x2 Double
-                  newWPi iL _ = withListOfIndexes @y1 (unknownIndices iL) (deleteRowsM @toDel newW)
+                  newWPi iL _ = withListOfIndexes @y1 (unknownIndexes iL) (deleteRowsM @toDel newW)
 
                   newMuP :: forall toDel. ((toDel <= y1) ~ 'True)
                          => LessThen x1 -> Proxy toDel -> DimMatrix R.D (y1 - toDel) One Double
-                  newMuP iL _ = withListOfIndexes @y1 (unknownIndices iL) (deleteRowsM @toDel newMu)
+                  newMuP iL _ = withListOfIndexes @y1 (unknownIndexes iL) (deleteRowsM @toDel newMu)
 
+                  -- the same as yP, but with subtracted mean vector
                   yCenteredP :: forall toDel. ((toDel <= y1) ~ 'True)
                              => LessThen x1 -> Proxy toDel -> DimMatrix R.D (y1 - toDel) One Double
                   yCenteredP iL@(Less iP) toDelP = (yP iP toDelP) -^^ (newMuP iL toDelP)
@@ -332,14 +367,17 @@ emStepsMissed learnMatrix initMatrix initVariance stopParam =
                         => LessThen x1 -> Proxy toDel -> DimMatrix R.D (y1 - toDel) (y1 - toDel) Double
                   invMY iL toDelP = mapDiagonalM (+newVariance) $ (newWPi iL toDelP) `mulM` (transposeM $ newWPi iL toDelP)
 
-                  knownIndices :: LessThen x1 -> [Int]
-                  knownIndices iL = [0..(d - 1)] \\ (unknownIndices iL)
+                  -- Indexes of known rows in i-th column
+                  knownIndexes :: LessThen x1 -> [Int]
+                  knownIndexes iL = [0..(d - 1)] \\ (unknownIndexes iL)
 
+                  -- calculate the addend of expLogLikelihood for i-th column
                   expLogLikelihoodStep :: LessThen x1 -> LessThen y1 -> Double
                   expLogLikelihoodStep iL (Less toDelP) =
-                    (fromIntegral $ length $ knownIndices iL)*(log $ 2*pi) + (log $ detSM $ invMY iL toDelP) +
+                    (fromIntegral $ length $ knownIndexes iL)*(log $ 2*pi) + (log $ detSM $ invMY iL toDelP) +
                     (trace2SM $ (invMY iL toDelP) `solveM` (yCenteredProd iL toDelP))
 
+                  -- recursively calclulate the total expLogLikelihood
                   expLogLikelihood_ :: forall (i :: Nat). ((i <= x1) ~ 'True ) => Sing i -> Double
                   expLogLikelihood_ SZ = 0.0
                   expLogLikelihood_ (SS l) =
@@ -348,24 +386,27 @@ emStepsMissed learnMatrix initMatrix initVariance stopParam =
 
               in (-1.0)*(case lemmaXLEqX (Sing :: Sing x1) (Sing :: Sing x1) of LS -> expLogLikelihood_ (Sing :: Sing x1))/2.0
 
+            -- Input matrix with restored data
             restoredData =
-              let muX :: DimMatrix R.D x2 One Double
-                  muX = meanColumnM (transposeM expX)
-
+              let muX = meanColumnM (transposeM expX)
                   finalMu = (newMu +^^ (newW `mulM` muX))
-
                   wtrw = (transposeM newW) `mulM` newW
-
                   factor1 = newW `mulM` (invSM wtrw)
-
                   factor2 = mapDiagonalM (+newVariance) wtrw
-
+                  -- Centered input matrix. Mean vector will be added below.
                   restoredCentered =  factor1 `mulM` factor2 `mulM` expX
-
               in restoredCentered +^^ extendX @x1 finalMu
-
+            -- difference between old variance (from the previous step) and new variance
             diffVariance = abs $ newVariance - oldVariance
+            -- maximum of the differences between elements of an old W and a new W matrix
             maxDiffNewOldW = foldAllSM max 0.0 $ mapMM abs $ oldW -^^ newW
+            -- if the stop paramater is maximum iterations value then
+            -- check a current iteration
+            -- If the stop parameter is stopDiffBetweenIterations then
+            -- check if maximum between maxDiffNewOldW and diffVariance is lower then given stop parameter.
+            -- If the convergence condition is satisfied then stop the cycle and return W,
+            -- variance, expLogLikelihood and restored input
+            -- otherwise call stepOne again.
         in case stopParam of
               Left maxIteration ->
                 if maxIteration > iteration
@@ -377,6 +418,7 @@ emStepsMissed learnMatrix initMatrix initVariance stopParam =
                 else (newW,newVariance, expLogLikelihood, Just restoredData)
   in stepOne initMu initMatrix initVariance 0
 
+-- remove DimMatrix wrapper
 convertPPCATypeSafeData
   :: (DimMatrix R.D y x Double, Double, Double, Maybe (DimMatrix R.D y1 x1 Double))
   -> (Matrix R.D Double, Double, Double, Maybe (Matrix R.D Double))

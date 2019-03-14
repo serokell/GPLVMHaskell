@@ -18,8 +18,6 @@ import Data.Type.Natural
 newtype DimMatrix r (y :: Nat) (x :: Nat) a
   = DimMatrix { getInternal :: Matrix r a}
 
-data A = A
-
 -- | input and output data structure for PPCA
 -- The last element in case of data without missed values should be Nothing
 data PPCA = PPCA
@@ -43,7 +41,6 @@ type family (n :: Nat) :+: (m :: Nat) where
   (:+:) n ('Z) = n
   (:+:) n ('S l) = ('S n) :+: l
 
-
 -- | Data type with evidence that a <= b
 data (a :: k) :<: (b :: k) where
   LS :: forall k (a :: k) (b :: k). ((a <= b) ~ 'True) => a :<: b
@@ -61,7 +58,6 @@ instance LSDecide Nat where
 lessNat :: forall (a :: Nat) (b :: Nat). Sing a -> Sing b -> Maybe (a :<: b)
 lessNat a b | toNatural a <= toNatural b = Just (unsafeCoerce# (LS :: Zero :<: One))
             | otherwise = Nothing
-
 
 
 
