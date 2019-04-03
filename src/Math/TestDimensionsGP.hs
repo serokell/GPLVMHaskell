@@ -10,7 +10,7 @@ import Control.Lens (makeLenses)
 import Data.Array.Repa ((:.)(..), Array(..), D, DIM1, DIM2, Source, Z(..))
 import qualified Data.Array.Repa as R
 import GHC.TypeLits hiding (someNatVal)
-import GPLVM.Types
+import GPLVM.Types hiding (InputObservations)
 import Numeric.Dimensions
 
 import Data.Array.Repa.Algorithms.Matrix

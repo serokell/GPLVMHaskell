@@ -46,7 +46,7 @@ import Universum hiding (Vector, transpose, map, natVal,
 import           GHC.TypeLits hiding (someNatVal)
 
 import           Data.Array.Repa
-import           Data.Array.Repa.Algorithms.Matrix
+import           Data.Array.Repa.Algorithms.Matrix hiding (trace2S)
 import           Data.Random.Normal (normals)
 import           Data.Vector.Unboxed.Base (Unbox)
 import           Data.Vinyl.TypeLevel (AllConstrained)

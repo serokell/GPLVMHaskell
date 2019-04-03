@@ -24,9 +24,9 @@ library
       GPLVM.GaussianProcessLV
       GPLVM.PCA
       GPLVM.PPCA
-      GPLVM.IVM
       GPLVM.Types
       GPLVM.Util
+      GPLVM.TypeSafe.IVM
       GPLVM.TypeSafe.PCA
       GPLVM.TypeSafe.PPCA
       GPLVM.TypeSafe.Types

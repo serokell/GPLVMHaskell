@@ -37,7 +37,7 @@ data PCA = PCA
   , _eigenValues  :: Matrix D Double
   , _finalData    :: Matrix D Double
   , _restoredData :: Matrix D Double
-  , _meanMatrix :: Matrix D Double
+  , _meanMatrix   :: Matrix D Double
   }
 
 makeLenses ''PCA
