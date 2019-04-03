@@ -4,12 +4,13 @@ packages:
 - .
 
 extra-deps:
-- normaldistribution-1.1.0.3
-- primitive-0.6.1.1
 - repa-algorithms-3.4.1.3@sha256:86e7e11f2ad4095d589fd23700350f4034ab2e1d8e094accb7fbe770af88175e
+- normaldistribution-1.1.0.3
+- type-natural-0.8.2.0@sha256:fb69402932813da1cdedb537b3f81b68740629264b71de30bd981396abebb0b1
+- equational-reasoning-0.6.0.0@sha256:e47ae43f74173e9084d1b09e3c3e378be3710b5eeeda2136f158bf73aceaaba5
+- ghc-typelits-presburger-0.2.0.5@sha256:5f46bd260db08053845547202e356d6f63cc02af066a1990e39346d90cb7ea06
+- singletons-2.4.1@sha256:3010690cdcf3cd9556f2a6ec5321a3ed411ba5d9674113a4c54db1ae2c408ca9
 
-- git: https://github.com/adscib/monad-bayes
-  commit: 647ba7cb5a98ae028600f3d828828616891b40fb
 - git: https://github.com/Haskell-mouse/repa-linear-algebra
   commit: 6fdf916b294af891bc6423728f3f71ac2095d95d
 

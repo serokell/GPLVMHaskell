@@ -1,6 +1,8 @@
 module GPLVM.Util
        ( deleteRows
        , diag
+       , getColumns
+       , deleteColumns
        , getRows
        , mapDiagonal
        , mapIndexed
@@ -16,6 +18,8 @@ module GPLVM.Util
        , updateMatrix2
        , toMatrix
        , toMatrix'
+       , trace2S
+       , trace2P
        , zipWithArray
        , (++^)
        , (**^)
@@ -31,25 +35,42 @@ module GPLVM.Util
 
 import Prelude (RealFloat, head, isNaN)
 import Universum hiding
-  (All, Vector, head, map, size, sum, transpose, traverse, zipWith)
+  (All, Vector, head, map, size, sum, toList, trace, transpose, traverse,
+  zipWith)
 
-import Data.Array.Repa
+import Data.Array.Repa hiding ((++))
 import Data.Array.Repa.Repr.Unboxed (Unbox)
 import Data.Array.Repa.Shape (size)
+import Data.Array.Repa.Unsafe (unsafeBackpermute)
 import Data.List ((!!), (\\))
 import Data.Random.Normal (normals)
+import Debug.Trace
 import Numeric.LinearAlgebra.Repa hiding (Matrix, Vector, diag)
 import System.Random (Random, RandomGen)
 
 import GPLVM.Types
+
+trace2S :: Array U DIM2 Double -> Double
+trace2S x
+ = sumAllS $ unsafeBackpermute (Z :. (min nRows nColumns)) (\(Z :. i) -> (Z :. i :. i)) x
+ where
+    (Z :. nRows :. nColumns) = extent x
+
+trace2P :: Monad m => Array U DIM2 Double -> m Double
+trace2P x
+ = sumAllP $ slice y (Z :. (0 :: Int) :. All)
+ where
+    y               =  unsafeBackpermute dim f x
+    f (Z :. i :. j) = Z :. (i + j) `mod` nRows:. j
+    dim@(Z :. nRows :. _) = extent x
 
 deleteRows
   :: forall a. Unbox a
   => [Int]
   -> Matrix D a
   -> Matrix D a
-deleteRows indices m@(ADelayed (Z :. x0 :. _) _) =
-  getRows ([0..(x0 - 1)] \\ indices) m
+deleteRows indices m@(ADelayed (Z :. y0 :. _) _) =
+  getRows ([0..(y0 - 1)] \\ indices) m
 
 getRows
   :: forall a. Unbox a
@@ -57,12 +78,31 @@ getRows
   -> Matrix D a
   -> Matrix D a
 getRows [] _ = delay $ fromListUnboxed (Z :. (0 :: Int) :. (0 :: Int)) []
-getRows indices m@(ADelayed (Z :. x0 :. y0) _) =
+getRows indices m@(ADelayed (Z :. y0 :. x0) _) =
   let numOfRows = length indices
-  in if minimum indices < 0 || maximum indices > (x0 -1)
-     then error "there are nonexistent numbers of rows"
-     else backpermute (Z :. numOfRows :. y0) (\(Z :. x :. y) -> (Z :. (indices !! x) :. y)) m
+  in if minimum indices < 0 || maximum indices > (y0 -1)
+     then error $ "there are nonexistent numbers of rows"
+     else backpermute (Z :. numOfRows :. x0) (\(Z :. y :. x) -> (Z :. (indices !! y) :. x)) m
 
+getColumns
+  :: forall a. Unbox a
+  => [Int]
+  -> Matrix D a
+  -> Matrix D a
+getColumns [] _ = delay $ fromListUnboxed (Z :. (0 :: Int) :. (0 :: Int)) []
+getColumns indices m@(ADelayed (Z :. y0 :. x0) _) =
+  let numOfColumns = length indices
+  in if minimum indices < 0 || maximum indices > (x0 -1)
+     then error "there are nonexistent numbers of columns"
+     else backpermute (Z :. y0 :. numOfColumns) (\(Z :. y :. x) -> (Z :. y :. (indices !! x) )) m
+
+deleteColumns
+  :: forall a. Unbox a
+  => [Int]
+  -> Matrix D a
+  -> Matrix D a
+deleteColumns indices m@(ADelayed (Z :. _ :. x0) _) =
+  getColumns ([0..(x0 - 1)] \\ indices) m
 
 diag
   :: Matrix D a

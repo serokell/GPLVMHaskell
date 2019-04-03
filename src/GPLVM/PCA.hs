@@ -7,15 +7,17 @@ module GPLVM.PCA
        , finalData
        , makePCA
        , restoredData
+       , meanMatrix
        ) where
 
-import Universum hiding (All, Vector, transpose)
+import Universum hiding (All, Vector, trace, transpose)
 
 import GPLVM.Types
 
 import Control.Lens (makeLenses)
 import Data.Array.Repa
 import Data.Array.Repa.Repr.ForeignPtr
+import Debug.Trace
 import Numeric.LinearAlgebra.Repa hiding (Matrix, Vector)
 
 data PCA = PCA
@@ -25,6 +27,7 @@ data PCA = PCA
     , _eigenValues  :: Vector F Double
     , _finalData    :: Matrix D Double
     , _restoredData :: Matrix D Double
+    , _meanMatrix   :: Matrix D Double
   }
 
 makeLenses ''PCA
@@ -37,8 +40,8 @@ makePCA desiredDimensions input =
   let _inputData = input
       (Z :. yInp :. _) = extent input                                          -- get dimension
       (meanVec, _covariance) = meanCovS input
-      meanMatrix = extend (Z :. yInp :. All) meanVec
-      adjustInput' = input -^ meanMatrix
+      _meanMatrix = extend (Z :. yInp :. All) meanVec
+      adjustInput'@(ADelayed (Z :. y1 :. x1) _) = input -^ _meanMatrix
       (_eigenValues, eigenVec) = eigSH _covariance
       eigenVecD@(ADelayed (Z :. y :. x) f) = transpose eigenVec              -- transposing is almost free
       eigenVectors' =                                                        -- leave only n desired eigenvectors
@@ -46,8 +49,8 @@ makePCA desiredDimensions input =
         then eigenVecD
         else ADelayed (Z :. desiredDimensions :. x) f
       _eigenVectors = transpose eigenVectors'                       -- colunmns are eigenvectors
-      finalData' = runIdentity $ eigenVectors' `mulP` transpose adjustInput' -- data in new eigenvectors space
+      finalData' = trace (show @String $ extent $ eigenVec) $ runIdentity $ eigenVectors' `mulP` transpose adjustInput' -- data in new eigenvectors space
       _finalData = transpose finalData'
       restoredDataWOMean = transpose $ pinvS eigenVectors' `mul` finalData'  -- restore to the original space
-      _restoredData = restoredDataWOMean +^ meanMatrix              -- add mean
+      _restoredData = restoredDataWOMean +^ _meanMatrix              -- add mean
   in PCA{..}
