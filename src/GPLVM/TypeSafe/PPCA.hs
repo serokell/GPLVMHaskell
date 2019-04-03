@@ -340,7 +340,7 @@ emStepsMissed learnMatrix initMatrix initVariance stopParam =
                     newVariance_ (SS l) =
                       case lemma1 l (Sing :: Sing x1)
                       of LS -> withSingI l $ (newVariance_ l) + ((withDelNumber (flip varianceStep)) (Less (Proxy :: Proxy (i - One))))
-                in (case lemmaXLEqX (Sing :: Sing x1) (Sing :: Sing x1) of LS -> newVariance_ (Sing :: Sing x1))/knownVars
+                in case lemmaXLEqX (Sing :: Sing x1) (Sing :: Sing x1) of LS -> (newVariance_ (Sing :: Sing x1))/knownVars
 
             -- Expectation of logarithm of likelihood
             -- should be calculated only in the last iterarion

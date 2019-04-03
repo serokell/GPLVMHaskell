@@ -9,4 +9,7 @@ import Universum hiding (Vector)
 
 import Control.Lens (makeLenses)
 import Data.Array.Repa
-import Numeric.LinearAlgebra.Repa hiding (Matrix, Vector)
+import GPLVM.TypeSafe.Types
+import GPLVM.TypeSafe.Util
+--import Numeric.LinearAlgebra.Repa hiding (Matrix, Vector)
+

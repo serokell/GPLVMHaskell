@@ -18,6 +18,7 @@ import Data.Type.Natural
 newtype DimMatrix r (y :: Nat) (x :: Nat) a
   = DimMatrix { getInternal :: Matrix r a}
 
+
 -- | input and output data structure for PPCA
 -- The last element in case of data without missed values should be Nothing
 data PPCA = PPCA

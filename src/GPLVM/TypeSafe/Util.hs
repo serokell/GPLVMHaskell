@@ -1,4 +1,4 @@
-{-# LANGUAGE AllowAmbiguousTypes, MagicHash #-}
+{-# LANGUAGE AllowAmbiguousTypes, FlexibleContexts, MagicHash #-}
 
 -- | Utility functions for type-safe PPCA
 -- Contain mostly redefined functions for DimMatrix wrapper
@@ -64,6 +64,14 @@ extendX (DimMatrix m) =
   let n = natToInt $ fromSing (Sing :: Sing n) :: Int
   in DimMatrix $ (extend (Any :. n) $ slice m (Any   :.  (0 :: Int)))
 
+-- | Replicates the given row
+extendY :: forall n x. (SingI n)
+        => DimMatrix D One x Double
+        -> DimMatrix D n x Double
+extendY (DimMatrix m) =
+  let n = natToInt $ fromSing (Sing :: Sing n) :: Int
+  in DimMatrix $ (extend (Any :. n :. All) $ slice m (Any   :.  (0 :: Int) :. All))
+
 -- | Returns the row with given index
 getRow
   :: forall n x y. (((n <= y) ~ 'True), SingI n)
@@ -102,6 +110,14 @@ deleteColumnsM
 deleteColumnsM (DimMatrix m) indexes = DimMatrix $
   deleteColumns indexes m
 
+getFirstColumns
+  :: forall toSave y1 x1. (SingI toSave, toSave <= x1 ~ 'True)
+  => DimMatrix D y1 x1 Double
+  -> DimMatrix D y1 toSave Double
+getFirstColumns (DimMatrix m@(ADelayed (Z :. y :. x) f)) =
+  let desiredColumns = natToInt $ fromSing (Sing :: Sing toSave)
+  in DimMatrix $ ADelayed (Z :. y :. desiredColumns) f
+
 sumListMatricesM
   :: [DimMatrix D y x Double]
   -> DimMatrix D y x Double
@@ -138,6 +154,11 @@ invSM
   => DimMatrix D y x Double
   -> DimMatrix D y x Double
 invSM (DimMatrix m) = DimMatrix $ delay  $ invS m
+
+pinvSM
+  :: DimMatrix D y x Double
+  -> DimMatrix D x y Double
+pinvSM (DimMatrix m) = DimMatrix $ delay $ pinvS m
 
 substractMeanM
   :: DimMatrix D y x Double
@@ -192,6 +213,13 @@ cholM
   -> DimMatrix D y x Double
 cholM (DimMatrix m) = DimMatrix $ delay  $ chol $ trustSym $ computeS m
 
+meanCovSM
+  :: DimMatrix D y x Double
+  -> (DimMatrix D One x Double, DimMatrix D x x Double)
+meanCovSM (DimMatrix m) =
+  let (meanVec, covMatrix) = meanCovS m
+  in ((DimMatrix $ extend (Any  :. (1 :: Int) :. All) meanVec), DimMatrix $ delay $ unSym covMatrix)
+
 solveM :: forall x1 y1 x2 y2. (y1 ~ y2, x1 ~ y2)
        => DimMatrix D y1 x1 Double
        -> DimMatrix D y2 x2 Double
@@ -214,6 +242,14 @@ detSM
   :: DimMatrix D y x Double
   -> Double
 detSM (DimMatrix m) = detS m
+
+eigSHM
+  :: (x ~ y, y1 ~ x) => DimMatrix D y x Double
+  -> (DimMatrix D y1 One Double, DimMatrix D y x Double)
+eigSHM (DimMatrix m) =
+  let hermM = trustSymS m
+      (eigenVals, eigenVecs) = eigSH hermM
+  in ((DimMatrix $ extend (Any   :.  (1 :: Int)) eigenVals), DimMatrix $ delay eigenVecs)
 
 diagM
   :: forall x y. (y ~ x)
