@@ -8,6 +8,7 @@ module GPLVM.Util
        , mapIndexed
        , meanColumn
        , meanColumnWithNan
+       , normalDistributionProbability
        , substractMeanWithNan
        , randomMatrixD
        , sumListMatrices
@@ -282,3 +283,8 @@ argmax f args =
   fst $
   maximum $
   [ (x, f x) | x <- args ]
+
+
+normalDistributionProbability :: Double -> Double -> Double -> Double
+normalDistributionProbability mean variance x =
+  (1.0/(sqrt(2*pi*variance)))*(exp (( (-1)*(x - mean)^2)/(2*variance)))

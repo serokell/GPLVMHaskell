@@ -26,6 +26,7 @@ import Data.Vinyl.TypeLevel (AllConstrained)
 import GPLVM.Types
 import GPLVM.TypeSafe.Types
 import GPLVM.TypeSafe.Util
+import GPLVM.Util (normalDistributionProbability)
 
 
 data IVMTypeSafe =
@@ -52,6 +53,8 @@ type family DecisionThree k :: Type
 
 type instance DecisionThree (a, b, c) = (Decision a, Decision b, Decision c)
 
+data Purpose = Regression | Classification
+
 
 makeIVMTypeSafe
   :: forall (d :: Nat) (m1 :: Nat) (m2 :: Nat) (n1 :: Nat) (n2 :: Nat).
@@ -62,15 +65,27 @@ makeIVMTypeSafe
   )
   => DimMatrix D m1 n1 Double  -- covariance
   -> DimMatrix D m2 n2 Double  -- input
+  -> Purpose
   -> IVMTypeSafe
-makeIVMTypeSafe = undefined
+makeIVMTypeSafe =
+	let gIN i n = (cIN (i - 1) n) +
+	      (normalDistributionProbability 0 1 (uIN (i - 1) n)) +
+	      (fi (uIN (i - 1) n))
+	    uIN i n = 1.0
+	    cIN i n = (yN n)*(sqrt (ksiIN i n))
+	    ksiIN i n = undefined
+	    uIN i n = (cIN i n)*((muIN i n) + b)
+	    fi = undefined
+	--    normal
+	in undefined
 
 makeIVM
   :: Int              -- a number of active point
   -> Matrix D Double  -- covariance matrix
   -> Matrix D Double  -- input matrix
+  -> Purpose
   -> IVM
-makeIVM actPoints cov input =
+makeIVM actPoints cov input purpose =
   case toSing (intToNat actPoints) of
     SomeSing (active :: Sing active) -> withSingI active $ withMat cov $
       \(mat1 :: DimMatrix D y x Double) -> withMat input $
@@ -80,7 +95,7 @@ makeIVM actPoints cov input =
         _ -> error "equalities are false"
         (Proved Refl, Proved Refl) -> case sol3 of
           Disproved _ -> error "desired dimension is greater than required"
-          Proved LS    -> convertTypeSafeIVM $ makeIVMTypeSafe @active mat1 mat2
+          Proved LS    -> convertTypeSafeIVM $ makeIVMTypeSafe @active mat1 mat2 purpose
   where
     checkInput
       :: forall (y :: Nat) (x :: Nat) (y2 :: Nat) (x2 :: Nat) (active :: Nat).
@@ -97,3 +112,5 @@ makeIVM actPoints cov input =
       -> IVM
     convertTypeSafeIVM (IVMInput (DimMatrix cov) (DimMatrix input) (DimMatrix sparsed) ind) =
       IVM cov input sparsed ind
+
+
