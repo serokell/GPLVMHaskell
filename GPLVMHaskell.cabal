@@ -4,7 +4,7 @@ version:        0.1.0.0
 description:    Please see the README on GitHub at <https://github.com/serokell/GPLVMHaskell#readme>
 homepage:       https://github.com/serokell/GPLVMHaskell#readme
 bug-reports:    https://github.com/serokell/GPLVMHaskell/issues
-author:         Author name here
+author:         Serokell OÜ
 maintainer:     example@example.com
 copyright:      2018 Author name here
 license:        BSD3
@@ -33,6 +33,9 @@ library
       GPLVM.TypeSafe.Util
       Math.TestDimensionsGP
   other-modules:
+      Math.Matrix
+      Math.TestDimensions
+      Math.TestDimensionsPCA
       Paths_GPLVMHaskell
   hs-source-dirs:
       src

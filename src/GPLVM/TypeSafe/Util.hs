@@ -266,3 +266,8 @@ toListM
   :: DimMatrix D x1 y1 Double
   -> [Double]
 toListM (DimMatrix m) = toList m
+
+-- | this type family is introduced as a syntax-sugar for multiple decisions
+type family Decisions k :: Type
+
+type instance Decisions (a, b, c) = (Decision a, Decision b, Decision c)

@@ -59,9 +59,9 @@ makePPCATypeSafe leaningVectors desiredDimensions stopParameter generator =
             (SomeSing (sDesired :: Sing d)) -> withSingI sDesired $
               let (ev1,ev2,ev3) = checkPPCAInputMatricesProp @d @y1 @y2 @x2 @x1
               in case ev1 of
-                Disproved _ -> error $ toText @String $ "dimentions x2 and d1 should be equal, but they are not"
+                Disproved _ -> error $ toText @String $ "dimensions x2 and d1 should be equal, but they are not"
                 Proved Refl -> case ev2 of
-                  Disproved _ -> error $ toText @String $ "dimentions y1 and y2 should be equal, but they are not"
+                  Disproved _ -> error $ toText @String $ "dimensions y1 and y2 should be equal, but they are not"
                   Proved Refl -> case ev3 of
                     Disproved _ -> error $ toText @String "Input matrix should have at least one column"
                     Proved LS -> if _noMissedData
@@ -230,7 +230,7 @@ emStepsMissed learnMatrix initMatrix initVariance stopParam =
             expX_ SZ = emptyM :: DimMatrix R.D x2 Zero Double
             expX_ (SS l) = case lemma1 l (Sing :: Sing x1) of LS -> withSingI l $ (expX_ l) ^++^ ((withDelNumber expXi) (Less (Proxy :: Proxy (i - One))))
 
-            -- expextation of X (y = W*X + mu + noise)
+            -- expectation of X (y = W*X + mu + noise)
             expX :: DimMatrix R.D x2 x1 Double
             expX = case lemmaXLEqX (Sing :: Sing x1) (Sing :: Sing x1) of LS -> expX_ (Sing :: Sing x1)
 
