@@ -7,29 +7,28 @@
 
 module GPLVM.TypeSafe.IVM
   ( IVM (..)
+  , IVMTypeSafe (..)
+  , Purpose (..)
   , makeIVM
   , makeIVMTypeSafe
   ) where
 
+import Prelude (log, (!!))
 import Universum hiding (All, Nat, One, Vector, transpose, (%~))
 
-import Prelude (log, (!!))
-
-import Control.Lens (makeLenses)
-
-import Numeric.LinearAlgebra.Repa hiding (Matrix, Vector)
-
-import Data.Array.Repa hiding (Z)
+import           Data.Array.Repa hiding (Z)
 import qualified Data.Array.Repa as R
-import Data.Singletons
-import Data.Singletons.Decide
-import Data.Type.Natural
-import Data.Vinyl.TypeLevel (AllConstrained)
+import           Data.Singletons
+import           Data.Singletons.Decide
+import           Data.Type.Natural
+import           Data.Vinyl.TypeLevel (AllConstrained)
 
-import GPLVM.Types
-import GPLVM.TypeSafe.Types
-import GPLVM.TypeSafe.Util
+import           GPLVM.Types
+import           GPLVM.TypeSafe.Types
+import           GPLVM.TypeSafe.Util
+import           GPLVM.Util (normalDistributionProbability)
 
+import           Numeric.LinearAlgebra.Repa hiding (Matrix, Vector)
 
 data IVMTypeSafe =
   forall (d :: Nat)                            -- d a number of active points
@@ -51,6 +50,10 @@ data IVM = IVM
   , selectedRows :: [Int]
   }
 
+data Purpose =
+    Regression
+  | Classification
+
 
 makeIVMTypeSafe
   :: forall (d :: Nat) (m1 :: Nat) (m2 :: Nat) (n1 :: Nat) (n2 :: Nat).
@@ -61,19 +64,41 @@ makeIVMTypeSafe
   )
   => DimMatrix D m1 n1 Double  -- covariance
   -> DimMatrix D m2 n2 Double  -- input
+  -> Purpose
   -> IVMTypeSafe
-makeIVMTypeSafe cov input =
-  let covariance = cov
-      inputMatrix = input
+makeIVMTypeSafe cov input purpose =
+  let covariance = undefined
+      inputMatrix = undefined
       sparsedMatrix = undefined
       resultIndices = undefined
   in  IVMTypeSafe{..}
   where
-    gIN, nuIN, ksiIN, deltaH
+    -- | bias parameter
+    b = undefined
+
+    yN = undefined
+
+    -- | cumulative gaussian distribution
+    phi z =
+      1 / sqrt (2 * pi) * bigPhi z
+
+    bigPhi z =
+      undefined
+
+    -- | the rest formulae required for IVM iterations
+    gIN, nuIN, muIN, uIN, ksiIN, deltaH
       :: Int -> Int -> Double
 
-    gIN i n =
-      undefined
+    muIN i n = undefined
+
+    uIN i n =
+      cIN i n * muIN i n + b
+
+    gIN i n = (cIN (i - 1) n) +
+      (normalDistributionProbability 0 1 (uIN (i - 1) n)) +
+    	(phi $ uIN (i - 1) n)
+
+    cIN i n = yN n * sqrt $ ksiIN i n
 
     nuIN i n =
       undefined
@@ -81,9 +106,11 @@ makeIVMTypeSafe cov input =
     ksiIN i n =
       take i (R.toList covarianceDiag) !! n
 
+    -- | vector obtained from covariance diagonal
     covarianceDiag =
       diagD . takeDiagD $ getInternal cov
 
+    -- | differential entropy
     deltaH i n =
       - 0.5 * log $ 1 - nuIN i n * ksiIN (i - 1) n
 
@@ -91,8 +118,9 @@ makeIVM
   :: Int              -- a number of active point
   -> Matrix D Double  -- covariance matrix
   -> Matrix D Double  -- input matrix
+  -> Purpose
   -> IVM
-makeIVM actPoints cov input =
+makeIVM actPoints cov input purpose =
   case toSing (intToNat actPoints) of
     SomeSing (active :: Sing active) -> withSingI active $ withMat cov $
       \(mat1 :: DimMatrix D y x Double) -> withMat input $
@@ -102,7 +130,7 @@ makeIVM actPoints cov input =
         _ -> error "equalities are false"
         (Proved Refl, Proved Refl) -> case sol3 of
           Disproved _ -> error "desired dimension is greater than required"
-          Proved LS   -> convertTypeSafeIVM $ makeIVMTypeSafe @active mat1 mat2
+          Proved LS    -> convertTypeSafeIVM $ makeIVMTypeSafe @active mat1 mat2 purpose
   where
     checkInput
       :: forall (y :: Nat) (x :: Nat) (y2 :: Nat) (x2 :: Nat) (active :: Nat).
