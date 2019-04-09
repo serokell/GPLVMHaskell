@@ -5,7 +5,7 @@ description:    Please see the README on GitHub at <https://github.com/serokell/
 homepage:       https://github.com/serokell/GPLVMHaskell#readme
 bug-reports:    https://github.com/serokell/GPLVMHaskell/issues
 author:         Serokell OÜ
-maintainer:     example@example.com
+maintainer:     hi@serokell.io
 copyright:      2018 Author name here
 license:        BSD3
 license-file:   LICENSE
@@ -35,13 +35,13 @@ library
   other-modules:
       Math.Matrix
       Math.TestDimensions
-      Math.TestDimensionsPCA
       Paths_GPLVMHaskell
   hs-source-dirs:
       src
   build-depends:
       base >=4.7 && <5
     , containers
+    , data-default
     , lens
     , dimensions
     , mtl
@@ -97,7 +97,6 @@ executable GPLVMHaskell-exe
   default-language: Haskell2010
   ghc-options:         -Wall
                        -fno-warn-orphans
-                       -fllvm
   default-extensions: RankNTypes
                       TemplateHaskell
                       TypeFamilies

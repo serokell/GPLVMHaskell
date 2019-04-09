@@ -4,6 +4,7 @@
 -- https://papers.nips.cc/paper/2240-fast-sparse-gaussian-process-methods-the-informative-vector-machine.pdf
 
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE LambdaCase #-}
 
 module GPLVM.TypeSafe.IVM
   ( IVM (..)
@@ -18,42 +19,50 @@ import Universum hiding (All, Nat, One, Vector, transpose, (%~))
 
 import           Data.Array.Repa hiding (Z)
 import qualified Data.Array.Repa as R
-import           Data.Singletons
-import           Data.Singletons.Decide
+import           Data.Default (Default (def))
+import           Data.Singletons.Decide (Decision (..), (:~:) (..), (%~))
 import           Data.Type.Natural
 import           Data.Vinyl.TypeLevel (AllConstrained)
 
-import           GPLVM.Types
-import           GPLVM.TypeSafe.Types
+import           GPLVM.Types (Matrix (..))
+import           GPLVM.TypeSafe.Types (DimMatrix (..), (:<:) (..), (%<))
 import           GPLVM.TypeSafe.Util
 import           GPLVM.Util (normalDistributionProbability)
 
 import           Numeric.LinearAlgebra.Repa hiding (Matrix, Vector)
 
+import           Statistics.Distribution (cumulative)
+import           Statistics.Distribution.Normal (standard)
+
 data IVMTypeSafe =
-  forall (d :: Nat)                            -- d a number of active points
-  (m :: Nat)                                   -- input columns
-  (n :: Nat).                                  -- input rows
+  forall (d :: Nat)                            -- ^ d is a number of active points
+  (m :: Nat)                                   -- ^ input columns
+  (n :: Nat).                                  -- ^ input rows
   (d <= n ~ 'True) => IVMTypeSafe
-  { covariance    :: DimMatrix D n n Double    -- input covariance
-  , inputMatrix   :: DimMatrix D m n Double    -- input matrix
-  , sparsedMatrix :: DimMatrix D m d Double    -- output sparsed matrix
-  , resultIndeces :: [Int]                     -- the list of row indeces in original
+  { covariance    :: DimMatrix D n n Double    -- ^ input covariance
+  , inputMatrix   :: DimMatrix D m n Double    -- ^ input matrix
+  , sparsedMatrix :: DimMatrix D m d Double    -- ^ output sparsed matrix
+  , resultIndeces :: [Int]                     -- ^ the list of row indeces in original
                                                -- | that were placed to the output sparsed matrix
+  , bias          :: Double                    -- ^ bias parameter
   }
 
 -- dimesionless version of IVM
 data IVM = IVM
-  { covar        :: Matrix D Double
-  , input        :: Matrix D Double
-  , sparsed      :: Matrix D Double
-  , selectedRows :: [Int]
+  { covar         :: Matrix D Double
+  , input         :: Matrix D Double
+  , sparsed       :: Matrix D Double
+  , selectedRows  :: [Int]
+  , bias'         :: Double
   }
 
 data Purpose =
     Regression
   | Classification
+  deriving (Show, Read)
 
+instance Default Purpose where
+  def = Regression
 
 makeIVMTypeSafe
   :: forall (d :: Nat) (m1 :: Nat) (m2 :: Nat) (n1 :: Nat) (n2 :: Nat).
@@ -62,28 +71,36 @@ makeIVMTypeSafe
   , m1 ~ n1
   , n1 ~ n2
   )
-  => DimMatrix D m1 n1 Double  -- covariance
-  -> DimMatrix D m2 n2 Double  -- input
-  -> Purpose
+  => DimMatrix D m1 n1 Double  -- ^ covariance
+  -> DimMatrix D m2 n2 Double  -- ^ input
+  -> Double                    -- ^ bias
+  -> Purpose                   -- ^ purpose: either regression or classification
   -> IVMTypeSafe
-makeIVMTypeSafe cov input purpose =
-  let covariance = undefined
-      inputMatrix = undefined
-      sparsedMatrix = undefined
-      resultIndices = undefined
-  in  IVMTypeSafe{..}
+makeIVMTypeSafe cov input biasP = \case
+  Regression -> actionReg [1..activeNum] $
+    mainRegLoop [1..actualNum] undefined
+  Classification -> actionClass [1..activeNum]
+    mainClassLoop [1..actualNum] undefined
   where
-    -- | bias parameter
-    b = undefined
+    activeNum, actualNum
+      :: Int
+    activeNum = natToInt $ demote @d :: Int
+    actualNum = natToInt $ demote @m2 :: Int
 
+    mainRegLoop = undefined
+
+    mainClassLoop = undefined
+
+    actionReg  = undefined
+
+    actionClass = undefined
+
+    yN :: Int -> Double
     yN = undefined
 
-    -- | cumulative gaussian distribution
-    phi z =
-      1 / sqrt (2 * pi) * bigPhi z
-
-    bigPhi z =
-      undefined
+    -- cumulative Gaussian distribution
+    phi :: Double -> Double
+    phi = cumulative standard
 
     -- | the rest formulae required for IVM iterations
     gIN, nuIN, muIN, uIN, ksiIN, deltaH
@@ -92,13 +109,13 @@ makeIVMTypeSafe cov input purpose =
     muIN i n = undefined
 
     uIN i n =
-      cIN i n * muIN i n + b
+      cIN i n * muIN i n + biasP
 
     gIN i n = (cIN (i - 1) n) +
       (normalDistributionProbability 0 1 (uIN (i - 1) n)) +
     	(phi $ uIN (i - 1) n)
 
-    cIN i n = yN n * sqrt $ ksiIN i n
+    cIN i n = yN n * (sqrt (ksiIN i n))
 
     nuIN i n =
       undefined
@@ -112,15 +129,16 @@ makeIVMTypeSafe cov input purpose =
 
     -- | differential entropy
     deltaH i n =
-      - 0.5 * log $ 1 - nuIN i n * ksiIN (i - 1) n
+      - 0.5 * (log $ 1 - nuIN i n * ksiIN (i - 1) n)
 
 makeIVM
-  :: Int              -- a number of active point
-  -> Matrix D Double  -- covariance matrix
-  -> Matrix D Double  -- input matrix
+  :: Int              -- ^ a number of active point
+  -> Matrix D Double  -- ^ covariance matrix
+  -> Matrix D Double  -- ^ input matrix
+  -> Double           -- ^ bias
   -> Purpose
   -> IVM
-makeIVM actPoints cov input purpose =
+makeIVM actPoints cov input biasP purpose =
   case toSing (intToNat actPoints) of
     SomeSing (active :: Sing active) -> withSingI active $ withMat cov $
       \(mat1 :: DimMatrix D y x Double) -> withMat input $
@@ -130,7 +148,7 @@ makeIVM actPoints cov input purpose =
         _ -> error "equalities are false"
         (Proved Refl, Proved Refl) -> case sol3 of
           Disproved _ -> error "desired dimension is greater than required"
-          Proved LS    -> convertTypeSafeIVM $ makeIVMTypeSafe @active mat1 mat2 purpose
+          Proved LS    -> convertTypeSafeIVM $ makeIVMTypeSafe @active mat1 mat2 biasP purpose
   where
     checkInput
       :: forall (y :: Nat) (x :: Nat) (y2 :: Nat) (x2 :: Nat) (active :: Nat).
@@ -145,5 +163,5 @@ makeIVM actPoints cov input purpose =
     convertTypeSafeIVM
       :: IVMTypeSafe
       -> IVM
-    convertTypeSafeIVM (IVMTypeSafe (DimMatrix cov) (DimMatrix input) (DimMatrix sparsed) ind) =
-      IVM cov input sparsed ind
+    convertTypeSafeIVM (IVMTypeSafe (DimMatrix cov) (DimMatrix input) (DimMatrix sparsed) ind bias) =
+      IVM cov input sparsed ind bias
