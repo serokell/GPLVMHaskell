@@ -15,10 +15,12 @@ module GPLVM.TypeSafe.IVM
   ) where
 
 import Prelude (log, (!!))
-import Universum hiding (All, Nat, One, Vector, transpose, (%~))
+import Universum hiding (All, Nat, One,
+                         Vector, toList, transpose,
+                         (%~))
 
-import           Data.Array.Repa hiding (Z)
-import qualified Data.Array.Repa as R
+import           Data.Array.Repa hiding (Z, zipWith)
+import           Data.Array.Repa (toList)
 import           Data.Default (Default (def))
 import           Data.Singletons.Decide (Decision (..), (:~:) (..), (%~))
 import           Data.Type.Natural
@@ -26,7 +28,7 @@ import           Data.Vinyl.TypeLevel (AllConstrained)
 
 import           GPLVM.Types (Matrix (..))
 import           GPLVM.TypeSafe.Types (DimMatrix (..), (:<:) (..), (%<))
-import           GPLVM.TypeSafe.Util
+import           GPLVM.TypeSafe.Util (withMat, Decisions)
 import           GPLVM.Util (normalDistributionProbability)
 
 import           Numeric.LinearAlgebra.Repa hiding (Matrix, Vector)
@@ -38,29 +40,34 @@ data IVMTypeSafe =
   forall (d :: Nat)                            -- ^ d is a number of active points
   (m :: Nat)                                   -- ^ input columns
   (n :: Nat).                                  -- ^ input rows
-  (d <= n ~ 'True) => IVMTypeSafe
+  (d <= n ~ 'True) => IVMTypeSafe              -- ^ a justification that d <= n is true
   { covariance    :: DimMatrix D n n Double    -- ^ input covariance
   , inputMatrix   :: DimMatrix D m n Double    -- ^ input matrix
   , sparsedMatrix :: DimMatrix D m d Double    -- ^ output sparsed matrix
-  , resultIndeces :: [Int]                     -- ^ the list of row indeces in original
+  , resultIndices :: [Int]                     -- ^ the list of row indices in original
                                                -- | that were placed to the output sparsed matrix
   , bias          :: Double                    -- ^ bias parameter
   }
 
 -- dimesionless version of IVM
 data IVM = IVM
-  { covar         :: Matrix D Double
-  , input         :: Matrix D Double
-  , sparsed       :: Matrix D Double
-  , selectedRows  :: [Int]
-  , bias'         :: Double
+  { covar         :: Matrix D Double  -- ^ dimensionless covariance
+  , input         :: Matrix D Double  -- ^ dimesionless input matrix
+  , sparsed       :: Matrix D Double  -- ^ dimesionless sparsed output matrix
+  , selectedRows  :: [Int]            -- ^ selected rows defined similarly to resultIndices
+                                      -- | in IVMTypeSafe
+  , bias'         :: Double           -- ^ bias is like bias in IVMTypeSafe
   }
 
+-- | We may use IVM either for regression or classification.
+-- | This flag allows one to choose one of these tasks
 data Purpose =
     Regression
   | Classification
   deriving (Show, Read)
 
+
+-- | By default, IVM makes regression
 instance Default Purpose where
   def = Regression
 
@@ -73,27 +80,31 @@ makeIVMTypeSafe
   )
   => DimMatrix D m1 n1 Double  -- ^ covariance
   -> DimMatrix D m2 n2 Double  -- ^ input
-  -> Double                    -- ^ bias
+  -> Double                    -- ^ bias parameter
   -> Purpose                   -- ^ purpose: either regression or classification
   -> IVMTypeSafe
 makeIVMTypeSafe cov input biasP = \case
-  Regression -> actionReg [1..activeNum] $
-    mainRegLoop [1..actualNum] undefined
-  Classification -> actionClass [1..activeNum]
-    mainClassLoop [1..actualNum] undefined
+  Regression -> actionReg
+  Classification -> actionClass
   where
     activeNum, actualNum
       :: Int
     activeNum = natToInt $ demote @d :: Int
     actualNum = natToInt $ demote @m2 :: Int
 
-    mainRegLoop = undefined
-
-    mainClassLoop = undefined
-
     actionReg  = undefined
 
     actionClass = undefined
+
+    allIndices = [1..actualNum]
+
+    activeIndices = [1..activeNum]
+
+    internalStep =
+      let l1 = zipWith gIN activeIndices allIndices
+          l2 = zipWith nuIN activeIndices allIndices
+          l3 = zipWith deltaH activeIndices allIndices
+      in (l1, l2, l3)
 
     yN :: Int -> Double
     yN = undefined
@@ -121,7 +132,7 @@ makeIVMTypeSafe cov input biasP = \case
       undefined
 
     ksiIN i n =
-      take i (R.toList covarianceDiag) !! n
+      take i (toList covarianceDiag) !! n
 
     -- | vector obtained from covariance diagonal
     covarianceDiag =
@@ -135,7 +146,7 @@ makeIVM
   :: Int              -- ^ a number of active point
   -> Matrix D Double  -- ^ covariance matrix
   -> Matrix D Double  -- ^ input matrix
-  -> Double           -- ^ bias
+  -> Double           -- ^ bias parameter
   -> Purpose
   -> IVM
 makeIVM actPoints cov input biasP purpose =
