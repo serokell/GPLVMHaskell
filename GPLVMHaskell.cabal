@@ -26,6 +26,7 @@ library
       GPLVM.PPCA
       GPLVM.Types
       GPLVM.Util
+      GPLVM.TypeSafe.GPLVM
       GPLVM.TypeSafe.IVM
       GPLVM.TypeSafe.PCA
       GPLVM.TypeSafe.PPCA
