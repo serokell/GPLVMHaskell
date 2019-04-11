@@ -1,11 +1,52 @@
 {-# LANGUAGE AllowAmbiguousTypes, FlexibleContexts, MagicHash #-}
 
 -- | Utility functions for type-safe PPCA
--- Contain mostly redefined functions for DimMatrix wrapper
+-- This module contains mostly redefined functions for DimMatrix wrapper
 -- around the REPA matrix
-module GPLVM.TypeSafe.Util where
+module GPLVM.TypeSafe.Util
+  ( cholM
+  , deleteColumnsM
+  , deleteRowsM
+  , detSM
+  , diagM
+  , eigSHM
+  , emptyM
+  , extendX
+  , extendY
+  , foldAllSM
+  , getColumn
+  , getFirstColumns
+  , getRow
+  , invSM
+  , makeLessThenNat
+  , mapDiagonalM
+  , mapMM
+  , meanColumnM
+  , meanColumnWithNanM
+  , meanCovSM
+  , mulM
+  , pinvSM
+  , solveM
+  , substractMeanM
+  , sumAllSM
+  , sumListMatricesM
+  , toListM
+  , trace2SM
+  , transposeM
+  , withMat
+  , withVec
+  , vecToMat
+  , (+^^)
+  , (^++^)
+  , (-^^)
+  , (*^^)
+  , (^!^)
+  , Decisions
+  ) where
 
-import Universum hiding (All, Any, Nat, One, map, toList, transpose, (%~), (++))
+import Universum hiding (All, Any, Nat, One, Vector,
+                         map, toList, transpose,
+                         (%~), (++))
 
 import GPLVM.Types
 import GPLVM.TypeSafe.Types
@@ -19,7 +60,10 @@ import Data.Type.Natural hiding (Z)
 
 -- | Creates new Matrix with dimensions in its type and passes it to continuation.
 -- Also creates SinI instances for dimensions
-withMat :: Matrix D Double -> (forall (x :: Nat) (y :: Nat). (SingI y, SingI x) => DimMatrix D x y Double -> k) -> k
+withMat
+  :: Matrix D Double
+  -> (forall (x :: Nat) (y :: Nat). (SingI y, SingI x) => DimMatrix D x y Double -> k)
+  -> k
 withMat m f =
     let (Z  :.  y  :.  x) = extent m
     in
@@ -27,6 +71,28 @@ withMat m f =
       SomeSing (sy :: Sing m) -> withSingI sy $
         case toSing (intToNat x) of
           SomeSing (sx :: Sing n) -> withSingI sx $ f (DimMatrix @D @m @n m)
+
+-- | Vector cousin of withMat
+withVec
+  :: Vector D a
+  -> (forall (n :: Nat). SingI n => DimVector D n a -> k)
+  -> k
+withVec vec f =
+  case toSing (intToNat n) of
+    SomeSing (sy :: Sing m) -> withSingI sy $ f (DimVector @D @m vec)
+  where
+    (Z :. n) = extent vec
+
+vecToMat
+  :: forall (n :: Nat) a.
+  SingI n
+  => DimVector D n a
+  -> DimMatrix D n One a
+vecToMat (DimVector vec) =
+  DimMatrix $
+  fromFunction (Z :. dim :. 1) (\(Z :. a :. b) -> index vec (Z :. a))
+  where
+    dim = natToInt $ demote @n :: Int
 
 -- | Creates type-level number which is less then given Nat type
 makeLessThenNat :: forall (max :: Nat). (SingI max) => Int -> LessThen max
@@ -220,10 +286,14 @@ meanCovSM (DimMatrix m) =
   let (meanVec, covMatrix) = meanCovS m
   in ((DimMatrix $ extend (Any  :. (1 :: Int) :. All) meanVec), DimMatrix $ delay $ unSym covMatrix)
 
-solveM :: forall x1 y1 x2 y2. (y1 ~ y2, x1 ~ y2)
-       => DimMatrix D y1 x1 Double
-       -> DimMatrix D y2 x2 Double
-       -> DimMatrix D y1 x2 Double
+solveM
+  :: forall x1 y1 x2 y2.
+  ( y1 ~ y2
+  , x1 ~ y2
+  )
+  => DimMatrix D y1 x1 Double
+  -> DimMatrix D y2 x2 Double
+  -> DimMatrix D y1 x2 Double
 solveM (DimMatrix m1) (DimMatrix m2) = DimMatrix $ delay $ m1 `solveS` m2
 
 sumAllSM

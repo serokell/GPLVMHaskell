@@ -29,7 +29,7 @@ import           Data.Vinyl.TypeLevel (AllConstrained)
 import           GPLVM.Types (Matrix (..))
 import           GPLVM.TypeSafe.Types (DimMatrix (..), (:<:) (..), (%<))
 import           GPLVM.TypeSafe.Util (withMat, Decisions)
-import           GPLVM.Util (normalDistributionProbability)
+import           GPLVM.Util (argmax, normalDistributionProbability)
 
 import           Numeric.LinearAlgebra.Repa hiding (Matrix, Vector)
 
@@ -100,10 +100,10 @@ makeIVMTypeSafe cov input biasP = \case
 
     activeIndices = [1..activeNum]
 
-    internalStep =
-      let l1 = zipWith gIN activeIndices allIndices
-          l2 = zipWith nuIN activeIndices allIndices
-          l3 = zipWith deltaH activeIndices allIndices
+    internalStep xs ys =
+      let l1 = zipWith gIN xs ys
+          l2 = zipWith nuIN xs ys
+          l3 = zipWith deltaH xs ys
       in (l1, l2, l3)
 
     yN :: Int -> Double
@@ -142,6 +142,14 @@ makeIVMTypeSafe cov input biasP = \case
     deltaH i n =
       - 0.5 * (log $ 1 - nuIN i n * ksiIN (i - 1) n)
 
+    -- vectors that should be updated during the main iteration
+
+    argMaxDelta i xs = argmax $ deltaH i <$> xs
+
+    sIN i n = undefined
+
+
+
 makeIVM
   :: Int              -- ^ a number of active point
   -> Matrix D Double  -- ^ covariance matrix
@@ -159,7 +167,7 @@ makeIVM actPoints cov input biasP purpose =
         _ -> error "equalities are false"
         (Proved Refl, Proved Refl) -> case sol3 of
           Disproved _ -> error "desired dimension is greater than required"
-          Proved LS    -> convertTypeSafeIVM $ makeIVMTypeSafe @active mat1 mat2 biasP purpose
+          Proved LS   -> convertTypeSafeIVM $ makeIVMTypeSafe @active mat1 mat2 biasP purpose
   where
     checkInput
       :: forall (y :: Nat) (x :: Nat) (y2 :: Nat) (x2 :: Nat) (active :: Nat).

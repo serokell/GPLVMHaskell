@@ -5,7 +5,6 @@ module Math.Matrix
        ( DimVector (..)
        , DimMatrix (..)
        , GPConstraint
-       , withVec
        , withMat
        , toMatrix
        , mulM
@@ -60,16 +59,6 @@ import GPLVM.Util hiding (randomMatrixD, zipWithArray)
 newtype DimVector r (n :: Nat) a
   = DimVector { runVector :: Vector r a }
   deriving Eq
-
-withVec
-  :: Vector D a
-  -> (forall n. KnownNat n => DimVector D n a -> k)
-  -> k
-withVec vec f =
-  case someNatVal (fromIntegral x) of
-    SomeNat (Proxy :: Proxy m) -> f (DimVector @D @m vec)
-  where
-    (Z :. x) = extent vec
 
 newtype DimMatrix r (y :: Nat) (x :: Nat) a
   = DimMatrix { getInternal :: Matrix r a}

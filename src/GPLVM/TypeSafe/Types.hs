@@ -1,9 +1,21 @@
 {-# LANGUAGE MagicHash, PolyKinds, UndecidableInstances #-}
 
 -- | Module with main types and type families
-module GPLVM.TypeSafe.Types where
+module GPLVM.TypeSafe.Types
+  ( DimMatrix (..)
+  , DimVector (..)
+  , LessThen (..)
+  , LSDecide
+  , PPCA (..)
+  , lemma1
+  , lessNat
+  , lemmaXLEqX
+  , (:+:)
+  , (:<:) (..)
+  , (%<)
+  ) where
 
-import Universum hiding (Nat, One, (%~), (++))
+import Universum hiding (Nat, One, Vector, (%~), (++))
 
 import GHC.Exts (unsafeCoerce#)
 
@@ -17,6 +29,10 @@ import Data.Type.Natural
 -- | Matrix data type with dimensions
 newtype DimMatrix r (y :: Nat) (x :: Nat) a
   = DimMatrix { getInternal :: Matrix r a}
+
+-- | Dimensional vector data type
+newtype DimVector r (y :: Nat) a
+  = DimVector { getInternalVec :: Vector r a }
 
 
 -- | input and output data structure for PPCA
