@@ -3,8 +3,7 @@
 -- See also
 -- https://papers.nips.cc/paper/2240-fast-sparse-gaussian-process-methods-the-informative-vector-machine.pdf
 
-{-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE AllowAmbiguousTypes, LambdaCase #-}
 
 module GPLVM.TypeSafe.IVM
   ( IVM (..)
@@ -129,7 +128,7 @@ makeIVMTypeSafe cov input biasP = \case
     cIN i n = yN n * (sqrt (ksiIN i n))
 
     nuIN i n =
-      undefined
+      gIN i n * (gIN i n + uIN (i - 1) n * cIN (i - 1) n)
 
     ksiIN i n =
       take i (toList covarianceDiag) !! n
@@ -162,7 +161,7 @@ makeIVM actPoints cov input biasP purpose =
     SomeSing (active :: Sing active) -> withSingI active $ withMat cov $
       \(mat1 :: DimMatrix D y x Double) -> withMat input $
       \(mat2 :: DimMatrix D y2 x2 Double) ->
-      let (sol1, sol2, sol3) = checkInput @y @x @y2 @x2 @active in
+      let (sol1, sol2, sol3) = checkInput @y @x @x2 @active in
       case (sol1, sol2) of
         _ -> error "equalities are false"
         (Proved Refl, Proved Refl) -> case sol3 of
@@ -170,7 +169,7 @@ makeIVM actPoints cov input biasP purpose =
           Proved LS   -> convertTypeSafeIVM $ makeIVMTypeSafe @active mat1 mat2 biasP purpose
   where
     checkInput
-      :: forall (y :: Nat) (x :: Nat) (y2 :: Nat) (x2 :: Nat) (active :: Nat).
+      :: forall (y :: Nat) (x :: Nat) (x2 :: Nat) (active :: Nat).
       (AllConstrained SingI '[x, y, x2, active])
       => Decisions (x :~: y, x :~: x2, active :<: x)
     checkInput =
@@ -182,5 +181,5 @@ makeIVM actPoints cov input biasP purpose =
     convertTypeSafeIVM
       :: IVMTypeSafe
       -> IVM
-    convertTypeSafeIVM (IVMTypeSafe (DimMatrix cov) (DimMatrix input) (DimMatrix sparsed) ind bias) =
-      IVM cov input sparsed ind bias
+    convertTypeSafeIVM (IVMTypeSafe (DimMatrix covar) (DimMatrix inputMat) (DimMatrix sparsed) ind bias) =
+      IVM covar inputMat sparsed ind bias

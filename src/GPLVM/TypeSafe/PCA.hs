@@ -10,6 +10,7 @@ module GPLVM.TypeSafe.PCA
        , inputData
        , finalData
        , makePCA
+       , makePCATypeSafe
        , restoredData
        , meanMatrix
        ) where

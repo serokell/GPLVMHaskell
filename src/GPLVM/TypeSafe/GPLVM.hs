@@ -16,6 +16,7 @@ import           Data.Singletons.Decide (Decision (..), (:~:) (..), (%~))
 import           Data.Type.Natural
 import           Data.Vinyl.TypeLevel (AllConstrained)
 
+import           GPLVM.TypeSafe.PCA (makePCA, makePCATypeSafe)
 import           GPLVM.TypeSafe.Util (withMat, Decisions)
 import           GPLVM.TypeSafe.Types (DimMatrix (..), (:<:) (..), (%<))
 import           GPLVM.Types (Matrix)
@@ -62,8 +63,8 @@ makeGPLVMTypeSafe
 makeGPLVMTypeSafe = undefined
 
 makeGPLVM
-  :: Int              -- ^ a number of active points
-  -> Int              -- ^ a number of iterations
+  :: Int              -- ^ the number of active points
+  -> Int              -- ^ the number of iterations
   -> Matrix D Double  -- ^ covariance matrix
   -> Matrix D Double  -- ^ input matrix
   -> WithIVM
