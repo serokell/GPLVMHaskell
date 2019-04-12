@@ -1,4 +1,4 @@
-{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE AllowAmbiguousTypes, LambdaCase #-}
 
 module GPLVM.TypeSafe.GPLVM
   ( GPLVMTypeSafe (..)
@@ -60,7 +60,9 @@ makeGPLVMTypeSafe
   -> DimMatrix D m2 n2 Double  -- ^ input
   -> WithIVM
   -> GPLVMTypeSafe
-makeGPLVMTypeSafe = undefined
+makeGPLVMTypeSafe iter cov input = \case
+  No -> undefined
+  Yes -> undefined
 
 makeGPLVM
   :: Int              -- ^ the number of active points
@@ -74,7 +76,7 @@ makeGPLVM active iterations cov input ivmFlag =
     SomeSing (active :: Sing active) -> withSingI active $ withMat cov $
       \(cov' :: DimMatrix D y x Double) -> withMat input $
       \(input' :: DimMatrix D y1 x1 Double) ->
-      let (sol1, sol2, sol3) = checkConditions @y @x @y1 @x1 @active in
+      let (sol1, sol2, sol3) = checkConditions @y @x @x1 @active in
       case (sol1, sol2) of
         _ -> error "equalities are false"
         (Proved Refl, Proved Refl) -> case sol3 of
@@ -82,13 +84,12 @@ makeGPLVM active iterations cov input ivmFlag =
           _ -> error "unequality is false"
   where
     checkConditions
-      :: forall (y :: Nat) (x :: Nat) (y2 :: Nat) (x2 :: Nat) (d :: Nat).
-      ( AllConstrained SingI '[x, y, x2, d]
-      )
-      => Decisions (x :~: y, x :~: x2, d :<: x)
+      :: forall (y :: Nat) (x :: Nat) (x1 :: Nat) (d :: Nat).
+      AllConstrained SingI '[x, y, x1, d]
+      => Decisions (x :~: y, x :~: x1, d :<: x)
     checkConditions =
       let des1 = (sing :: Sing x) %~ (sing :: Sing y)
-          des2 = (sing :: Sing x) %~ (sing :: Sing x2)
+          des2 = (sing :: Sing x) %~ (sing :: Sing x1)
           des3 = (sing :: Sing d) %< (sing :: Sing x)
       in (des1, des2, des3)
 
@@ -96,9 +97,9 @@ makeGPLVM active iterations cov input ivmFlag =
     fromTypeSafeToGPLVM
       :: GPLVMTypeSafe
       -> GPLVM
-    fromTypeSafeToGPLVM (GPLVMTypeSafe iter cov input result) =
-      GPLVM iter cov' input' result'
+    fromTypeSafeToGPLVM (GPLVMTypeSafe it covar inp result) =
+      GPLVM it cov' input' result'
       where
-        cov' = getInternal cov
-        input' = getInternal input
+        cov' = getInternal covar
+        input' = getInternal inp
         result' = getInternal result

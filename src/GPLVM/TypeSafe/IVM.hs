@@ -39,7 +39,7 @@ data IVMTypeSafe =
   forall (d :: Nat)                            -- ^ d is a number of active points
   (m :: Nat)                                   -- ^ input columns
   (n :: Nat).                                  -- ^ input rows
-  (d <= n ~ 'True) => IVMTypeSafe              -- ^ a justification that d <= n is true
+  (d <= n ~ 'True) => IVMTypeSafe              -- ^ a justification constraint that d <= n is true
   { covariance    :: DimMatrix D n n Double    -- ^ input covariance
   , inputMatrix   :: DimMatrix D m n Double    -- ^ input matrix
   , sparsedMatrix :: DimMatrix D m d Double    -- ^ output sparsed matrix
@@ -158,19 +158,19 @@ makeIVM
   -> IVM
 makeIVM actPoints cov input biasP purpose =
   case toSing (intToNat actPoints) of
-    SomeSing (active :: Sing active) -> withSingI active $ withMat cov $
+    SomeSing (active :: Sing act) -> withSingI active $ withMat cov $
       \(mat1 :: DimMatrix D y x Double) -> withMat input $
       \(mat2 :: DimMatrix D y2 x2 Double) ->
-      let (sol1, sol2, sol3) = checkInput @y @x @x2 @active in
+      let (sol1, sol2, sol3) = checkInput @y @x @x2 @act in
       case (sol1, sol2) of
         _ -> error "equalities are false"
         (Proved Refl, Proved Refl) -> case sol3 of
           Disproved _ -> error "desired dimension is greater than required"
-          Proved LS   -> convertTypeSafeIVM $ makeIVMTypeSafe @active mat1 mat2 biasP purpose
+          Proved LS   -> convertTypeSafeIVM $ makeIVMTypeSafe @act mat1 mat2 biasP purpose
   where
     checkInput
       :: forall (y :: Nat) (x :: Nat) (x2 :: Nat) (active :: Nat).
-      (AllConstrained SingI '[x, y, x2, active])
+      AllConstrained SingI '[x, y, x2, active]
       => Decisions (x :~: y, x :~: x2, active :<: x)
     checkInput =
       let des1 = (sing :: Sing x) %~ (sing :: Sing y)
