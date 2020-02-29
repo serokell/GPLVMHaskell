@@ -177,7 +177,7 @@ deleteColumnsM (DimMatrix m) indexes = DimMatrix $
   deleteColumns indexes m
 
 getFirstColumns
-  :: forall toSave y1 x1. (SingI toSave, toSave <= x1 ~ 'True)
+  :: forall toSave y1 x1. (SingI toSave, (toSave <= x1) ~ 'True)
   => DimMatrix D y1 x1 Double
   -> DimMatrix D y1 toSave Double
 getFirstColumns (DimMatrix m@(ADelayed (Z :. y :. x) f)) =

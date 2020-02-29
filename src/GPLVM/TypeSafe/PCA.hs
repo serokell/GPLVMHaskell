@@ -22,12 +22,9 @@ import GPLVM.TypeSafe.Types
 import GPLVM.TypeSafe.Util
 
 import Control.Lens (makeLenses)
-import Data.Array.Repa (D, extent)
-import qualified Data.Array.Repa as R (Z)
-import Data.Array.Repa.Repr.ForeignPtr
-import Numeric.LinearAlgebra.Repa hiding (Matrix, Vector)
+import Data.Array.Repa (D)
 
-import Data.Singletons.Decide ((:~:)(..), Decision(..), (%~))
+import Data.Singletons.Decide (Decision(..))
 import Data.Type.Natural
 import Data.Vinyl.TypeLevel (AllConstrained)
 
@@ -43,7 +40,7 @@ data PCA = PCA
 
 makeLenses ''PCA
 
-data TypeSafePCA = forall x y d. (d <= x ~ 'True) => TypeSafePCA
+data TypeSafePCA = forall x y d. ((d <= x) ~ 'True) => TypeSafePCA
   {
     desiredDim  :: Proxy d
   , inputData_  :: DimMatrix D y x Double
@@ -77,7 +74,7 @@ checkInput _ _ =
   in des
 
 makePCATypeSafe
-    :: forall d x y. (AllConstrained SingI '[d,x,y], d <= x ~ 'True)
+    :: forall d x y. (AllConstrained SingI '[d,x,y], (d <= x) ~ 'True)
     => Proxy (d :: Nat)
     -> DimMatrix D y x Double
     -> TypeSafePCA
@@ -90,8 +87,8 @@ makePCATypeSafe desiredDim inputData_ =
       (finalData'@(DimMatrix m1)) = (transposeM eigenVecsf) `mulM` transposeM adjustInput' -- data in new eigenvectors space
       finalData_ = transposeM finalData'
       eigenVecsf' = transposeM eigenVecsf
-      restoredDataWOMean@(DimMatrix m2) = trace (show @String $ extent m1) $ transposeM $ pinvSM eigenVecsf' `mulM` finalData'  -- restore to the original space
-      restoredData_ = trace (show @String $ extent m2) $ restoredDataWOMean +^^ meanMatrix_              -- add mean
+      restoredDataWOMean@(DimMatrix m2) = transposeM $ pinvSM eigenVecsf' `mulM` finalData'  -- restore to the original space
+      restoredData_ = restoredDataWOMean +^^ meanMatrix_              -- add mean
   in TypeSafePCA{..}
 
 convertTypSafeToPCA :: TypeSafePCA -> PCA

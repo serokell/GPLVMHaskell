@@ -10,7 +10,7 @@ module GPLVM.PCA
        , meanMatrix
        ) where
 
-import Universum hiding (All, Vector, trace, transpose)
+import Universum hiding (All, Vector, transpose)
 
 import GPLVM.Types
 
@@ -38,19 +38,25 @@ makePCA
     -> PCA
 makePCA desiredDimensions input =
   let _inputData = input
-      (Z :. yInp :. _) = extent input                                          -- get dimension
+         -- get dimension
+      (Z :. yInp :. _) = extent input                                          
       (meanVec, _covariance) = meanCovS input
       _meanMatrix = extend (Z :. yInp :. All) meanVec
       adjustInput'@(ADelayed (Z :. y1 :. x1) _) = input -^ _meanMatrix
       (_eigenValues, eigenVec) = eigSH _covariance
-      eigenVecD@(ADelayed (Z :. y :. x) f) = transpose eigenVec              -- transposing is almost free
-      eigenVectors' =                                                        -- leave only n desired eigenvectors
+      eigenVecD@(ADelayed (Z :. y :. x) f) = transpose eigenVec        
+        -- leave only n desired eigenvectors
+      eigenVectors' =                                                        
         if desiredDimensions >= y
         then eigenVecD
         else ADelayed (Z :. desiredDimensions :. x) f
-      _eigenVectors = transpose eigenVectors'                       -- colunmns are eigenvectors
-      finalData' = trace (show @String $ extent $ eigenVec) $ runIdentity $ eigenVectors' `mulP` transpose adjustInput' -- data in new eigenvectors space
+        -- colunmns are eigenvectors
+      _eigenVectors = transpose eigenVectors'                      
+        -- data in new eigenvectors space
+      finalData' = runIdentity $ eigenVectors' `mulP` transpose adjustInput' 
       _finalData = transpose finalData'
-      restoredDataWOMean = transpose $ pinvS eigenVectors' `mul` finalData'  -- restore to the original space
-      _restoredData = restoredDataWOMean +^ _meanMatrix              -- add mean
+        -- restore to the original space
+      restoredDataWOMean = transpose $ pinvS eigenVectors' `mul` finalData'
+        -- add mean  
+      _restoredData = restoredDataWOMean +^ _meanMatrix              
   in PCA{..}

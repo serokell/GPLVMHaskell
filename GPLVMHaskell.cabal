@@ -6,7 +6,7 @@ homepage:       https://github.com/serokell/GPLVMHaskell#readme
 bug-reports:    https://github.com/serokell/GPLVMHaskell/issues
 author:         Serokell OÜ
 maintainer:     hi@serokell.io
-copyright:      2018 Author name here
+copyright:      2020 Serokell
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
@@ -21,21 +21,16 @@ library
   exposed-modules:
       GPLVM.GPExample
       GPLVM.GaussianProcess
-      GPLVM.GaussianProcessLV
       GPLVM.PCA
       GPLVM.PPCA
       GPLVM.Types
       GPLVM.Util
-      GPLVM.TypeSafe.GPLVM
-      GPLVM.TypeSafe.IVM
       GPLVM.TypeSafe.PCA
       GPLVM.TypeSafe.PPCA
       GPLVM.TypeSafe.Types
       GPLVM.TypeSafe.Util
-      Math.TestDimensionsGP
   other-modules:
       Math.Matrix
-      Math.TestDimensions
       Paths_GPLVMHaskell
   hs-source-dirs:
       src
@@ -44,7 +39,7 @@ library
     , containers
     , data-default
     , lens
-    , dimensions
+    , ghc-typelits-presburger
     , mtl
     , normaldistribution
     , random

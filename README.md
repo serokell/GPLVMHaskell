@@ -30,6 +30,8 @@ Gaussian process latent variable model is a version of probabilistic principal c
 A Gaussian process is a non-parametric approach that allows one to find a distribution over some class of functions with respect to observed data.
 In GPLVM, we assume that we have generated the observed data from a low dimensional data, and this generation process is described by some function `f` up to Gaussian distributed noise `e`. `f` has a GP prior, i.e. GP prior with a zero mean and some kernel function k with some hyperparameters. Note that these functions are not necessarily linear.
 
+Currently GPLVM is still not implemented.
+
 ## Haskell implementation
 
 ### Why Haskell?
@@ -60,3 +62,14 @@ data GaussianProcessLatentVariable a = GaussianProcessLatentVariable {
     , _distrGPLVM ::  Distribution a
     }
 ```
+
+One could test PPCA algorithm via the application: 
+
+```$ GPLVMHaskell-exe test.pca.txt 1000 False```  
+
+The first parameter is a file with rows as observation points. 
+The second parameter is number of iterations. 
+The third one should be False for non-typesafe version and vice versa. 
+
+If there are "NaNs" in a file, then the algorithm version which could handle 
+lost or untrusted data would be applied. In this case the allication will return not only ***W*** matrix and log-likelihood but also restored original matrix.  

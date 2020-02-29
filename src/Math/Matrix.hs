@@ -21,7 +21,6 @@ module Math.Matrix
        , sumAllSM
        , trace2SM
        , toDimMatrix
-       , trace2SM
        , detSM
        , toMatrixM'
        , zipWithDim
@@ -45,11 +44,10 @@ import Universum hiding (Vector, transpose, map, natVal,
 import           GHC.TypeLits hiding (someNatVal)
 
 import           Data.Array.Repa
-import           Data.Array.Repa.Algorithms.Matrix hiding (trace2S)
 import           Data.Random.Normal (normals)
 import           Data.Vector.Unboxed.Base (Unbox)
 import           Data.Vinyl.TypeLevel (AllConstrained)
-import           Numeric.Dimensions
+--import           Numeric.Dimensions 
 import           Numeric.LinearAlgebra.Repa hiding (Matrix, Vector)
 import           System.Random (Random, RandomGen)
 
@@ -237,7 +235,7 @@ toMatrixM' (DimVector arr) =
   DimMatrix $ fromFunction (Z :. dimension :. 1) generator
   where
     dimension = size . extent $ arr
-    generator (Z :. rows :. cols) = linearIndex arr rows
+    generator (Z :. rows :. _) = linearIndex arr rows
 
 zipWithDim
   ::

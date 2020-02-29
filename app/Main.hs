@@ -3,7 +3,6 @@ module Main where
 import qualified Control.Applicative as CA
 import qualified Data.Array.Repa as R
 import Data.Attoparsec.Text as A
-import GHC.Stack
 import qualified GPLVM.PPCA as U
 import GPLVM.TypeSafe.PPCA
 import GPLVM.TypeSafe.Types
@@ -11,9 +10,9 @@ import Prelude (read)
 import System.Environment
 import System.IO hiding (putStrLn, readFile)
 import System.Random
-import Universum hiding (getArgs)
+import Universum
 
-main :: (HasCallStack) => IO ()
+main :: IO ()
 main = do
     [file, num', ts] <- getArgs
     let num = read num'
