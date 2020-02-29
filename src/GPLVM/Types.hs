@@ -1,63 +1,52 @@
-module GPLVM.Types where
+module GPLVM.Types
+       ( Covariance
+       , Distribution
+       , EigenVectors
+       , InputObservations (..)
+       , LatentSpacePoints (..)
+       , Matrix (..)
+       , Mean (..)
+       , ObservedData (..)
+       , Vector (..)
+       , unLatentSpacePoints
+       , unObservedData
+       , unInputObs
+       ) where
 
-import Universum
+import Universum hiding (Vector, transpose)
 
-import           Control.Lens (makeLenses)
+import Control.Lens (makeLenses)
 
-import           Numeric.Matrix (Matrix, MatrixElement)
-import qualified Numeric.Matrix as M
+import Data.Array.Repa
+import Data.Array.Repa.Repr.ForeignPtr
+-- import Foreign.Storable
+import Numeric.LinearAlgebra.Repa hiding (Matrix, Vector)
 
-type Distribution a = Matrix a -> a
+type Distribution r a = Matrix r a -> a
 
-type Mean a = Matrix a -> a
+type Mean r a = Matrix r a -> a
 
+type Covariance a = Herm a
 
+type Matrix r a = Array r DIM2 a
+
+type Vector r a = Array r DIM1 a
+
+type EigenVectors a = Matrix D a
+
+-- Real matrix, represented as unboxed vector.
 -------
 
-zeroMean :: Num a => Mean a
-zeroMean = const 0
-
-newtype LatentSpacePoints a = LatentSpacePoints { _unLatentSpacePoints :: Matrix a }
+newtype LatentSpacePoints a = LatentSpacePoints { _unLatentSpacePoints :: Matrix D a }
     deriving Eq
 
 makeLenses ''LatentSpacePoints
 
-toLatentSpacePoints
-    :: forall a. MatrixElement a
-    => Matrix a
-    -> LatentSpacePoints a
-toLatentSpacePoints = LatentSpacePoints . M.transpose
+newtype InputObservations a = InputObservations { _unInputObs :: Vector D a }
+    deriving Eq
 
-newtype ObservedData a = ObservedData { _unObservedData :: Matrix a }
+newtype ObservedData a = ObservedData { _unObservedData :: Matrix D a }
+    deriving Eq
 
 makeLenses ''ObservedData
-
-data GaussianProcess a = GaussianProcess {
-      _pointsGP :: Matrix a
-    , _outputGP :: ObservedData a
-    , _kernelGP :: Matrix a -> Matrix a -> Matrix a
-    , _distrGP ::  Distribution a
-    }
-
-makeLenses ''GaussianProcess
-
-covariaceMatrix
-    :: forall a. MatrixElement a
-    => GaussianProcess a
-    -> Maybe (Matrix a)
-covariaceMatrix gP = do
-    let kernelFun = gP ^. kernelGP
-    let points = gP ^. pointsGP
-    let output = (gP ^. outputGP) ^. unObservedData
-    let kernelMatrix = kernelFun points output
-    case (M.isSquare kernelMatrix && (kernelMatrix == M.transpose kernelMatrix)) of
-        False -> Nothing
-        True -> return kernelMatrix
-
-data GaussianProcessLatentVariable a = GaussianProcessLatentVariable {
-      _GPLVMObserved :: ObservedData a
-    , _kerGPLVM :: Matrix a -> Matrix a -> Matrix a
-    , _distrGPLVM ::  Distribution a
-    }
-
-makeLenses ''GaussianProcessLatentVariable
+makeLenses ''InputObservations

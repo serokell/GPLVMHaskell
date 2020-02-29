@@ -1,11 +1,22 @@
-resolver: nightly-2018-12-15
+resolver: nightly-2020-01-31
 
 packages:
 - .
 
 extra-deps:
-#- accelerate-1.2.0.1
-- bed-and-breakfast-0.5
+- normaldistribution-1.1.0.3
+- equational-reasoning-0.6.0.1
+- ghc-typelits-presburger-0.3.0.0
+- ghc-tcplugins-extra-0.3.2
+- singletons-presburger-0.3.0.0
+- repa-3.4.1.4
+- git: https://github.com/Haskell-mouse/repa-linear-algebra 
+  commit: eb6b72d5bda998e6e39c16888ca2a771a60b702d
+- vinyl-0.12.0
+- repa-algorithms-3.4.1.3
+- git: https://github.com/Haskell-mouse/type-natural
+  commit: af96bcf869e3b852da113ca3748c6c81246fb32d
+- hmatrix-0.20.0.0
 
-- git: https://github.com/adscib/monad-bayes
-  commit: 647ba7cb5a98ae028600f3d828828616891b40fb
+nix: 
+  packages: [liblapack, blas]

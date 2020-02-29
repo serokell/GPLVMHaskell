@@ -1,44 +1,60 @@
 cabal-version: 1.12
 name:           GPLVMHaskell
 version:        0.1.0.0
-description:    Please see the README on GitHub at <https://github.com/githubuser/GPLVMHaskell#readme>
-homepage:       https://github.com/githubuser/GPLVMHaskell#readme
-bug-reports:    https://github.com/githubuser/GPLVMHaskell/issues
-author:         Author name here
-maintainer:     example@example.com
-copyright:      2018 Author name here
+description:    Please see the README on GitHub at <https://github.com/serokell/GPLVMHaskell#readme>
+homepage:       https://github.com/serokell/GPLVMHaskell#readme
+bug-reports:    https://github.com/serokell/GPLVMHaskell/issues
+author:         Serokell OÜ
+maintainer:     hi@serokell.io
+copyright:      2020 Serokell
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
     README.md
-    ChangeLog.md
 
 source-repository head
   type: git
-  location: https://github.com/githubuser/GPLVMHaskell
+  location: https://github.com/serokell/GPLVMHaskell
 
 library
   exposed-modules:
-      Math
-      GPLVM.Basic
-      GPLVM.LinearSolver
+      GPLVM.GPExample
+      GPLVM.GaussianProcess
+      GPLVM.PCA
       GPLVM.PPCA
       GPLVM.Types
       GPLVM.Util
+      GPLVM.TypeSafe.PCA
+      GPLVM.TypeSafe.PPCA
+      GPLVM.TypeSafe.Types
+      GPLVM.TypeSafe.Util
   other-modules:
-      Paths_GPLVMHaskell
       Math.Matrix
+      Paths_GPLVMHaskell
   hs-source-dirs:
       src
   build-depends:
       base >=4.7 && <5
---    , accelerate
-    , bed-and-breakfast
     , containers
+    , data-default
     , lens
+    , ghc-typelits-presburger
+    , mtl
+    , normaldistribution
+    , random
+    , ghc-typelits-knownnat
+    , ghc-typelits-natnormalise
+    , type-natural
+    , singletons
     , repa
+    , repa-linear-algebra
+    , repa-algorithms
+    , statistics
+    , singletons
     , vector
+    , vinyl
+    , vec
     , universum
   build-tool-depends:
       autoexporter:autoexporter
@@ -47,12 +63,17 @@ library
                        -fno-warn-orphans
   default-extensions: NoImplicitPrelude
                       RankNTypes
+                      BangPatterns
                       TemplateHaskell
                       TypeFamilies
                       GADTs
                       DataKinds
+                      OverloadedStrings
+                      ScopedTypeVariables
                       TypeOperators
                       TypeApplications
+                      RecordWildCards
+                      MultiWayIf
 
 executable GPLVMHaskell-exe
   main-is: Main.hs
@@ -64,9 +85,22 @@ executable GPLVMHaskell-exe
   build-depends:
       GPLVMHaskell
     , base >=4.7 && <5
+    , ghc-typelits-knownnat
     , universum
+    , attoparsec
+    , random
+    , repa
   default-language: Haskell2010
   ghc-options:         -Wall
                        -fno-warn-orphans
-  default-extensions:   NoImplicitPrelude
-                        TemplateHaskell
+  default-extensions: RankNTypes
+                      TemplateHaskell
+                      TypeFamilies
+                      GADTs
+                      DataKinds
+                      OverloadedStrings
+                      ScopedTypeVariables
+                      TypeOperators
+                      TypeApplications
+                      RecordWildCards
+                      NoImplicitPrelude
